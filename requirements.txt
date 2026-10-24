@@ -1,0 +1,19 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+httpx>=0.27
+python-multipart>=0.0.9
+pillow>=10.4
+numpy
+diffusers>=0.35
+transformers>=4.45
+accelerate>=1.0
+peft>=0.13
+safetensors>=0.4.5
+sentencepiece
+protobuf
+ftfy
+imageio
+imageio-ffmpeg
+onnxruntime-gpu>=1.19
+huggingface_hub>=0.25
+# torch / torchvision are installed first from the CUDA 12.8 index by setup

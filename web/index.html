@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEKOSTUDIO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=Chakra+Petch:wght@400;500;600;700&family=Share+Tech+Mono&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<noscript>NEKOSTUDIO needs JavaScript.</noscript>
+<div id="os">
+  <canvas id="wall" aria-hidden="true"></canvas>
+
+  <nav id="rail" aria-label="Sections">
+    <div class="emb" aria-hidden="true">
+      <!-- cat-ear bracket mark -->
+      <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="miter"><path d="M8 42V17L14 5l10 11 10-11 6 12v25"/><path d="M8 42h9M40 42h-9"/><path d="M20 28h2M26 28h2"/></svg>
+    </div>
+    <button class="rb" data-go="create"><i class="ic"></i><span>CREATE</span></button>
+    <button class="rb" data-go="models"><i class="ic"></i><span>MODELS</span></button>
+    <button class="rb" data-go="motion"><i class="ic"></i><span>MOTION</span></button>
+    <button class="rb" data-go="lora"><i class="ic"></i><span>LORA</span></button>
+    <button class="rb" data-go="translate"><i class="ic"></i><span>TRANSLATE</span></button>
+    <button class="rb" data-go="gallery"><i class="ic"></i><span>GALLERY</span></button>
+    <button class="rb" data-go="settings"><i class="ic"></i><span>SETTINGS</span></button>
+    <div class="grow"></div>
+    <div class="ver" id="ver">NEKOSTUDIO</div>
+  </nav>
+
+  <div id="brand"><div class="w"><i>[</i> NEKOSTUDIO <i>]</i></div><div class="c">LOCAL AI ART STUDIO</div></div>
+  <div id="status">
+    <div class="t" id="clock">00:00:00</div>
+    <div class="d" id="date">----.--.-- ---</div>
+    <div class="sys" id="chips"></div>
+  </div>
+
+  <!-- ================= CREATE ================= -->
+  <section class="win" id="sec-create" hidden>
+    <header class="wh"><span class="wt">CREATE</span><span class="wsub">Image generation</span><span class="wrule"></span></header>
+    <div class="wc fit"><div class="empty" id="c-empty" hidden></div><div class="cols">
+      <div class="col">
+        <div class="field"><label for="c-ckpt">Checkpoint <span class="chip ok" id="c-ponychip" hidden>PONY</span></label><select id="c-ckpt"></select></div>
+        <div class="field">
+          <div class="lbl">LoRA <em><button class="btn sm" id="c-addlora" type="button">+ ADD</button></em></div>
+          <div id="c-loras" style="display:grid;gap:8px"></div>
+        </div>
+        <div class="field">
+          <div class="lbl">Prompt <em><button class="btn sm" id="c-topony" type="button" title="Translate prose into Pony tags">&rarr; PONY</button><button class="btn sm" id="c-undo" type="button" disabled>UNDO</button></em></div>
+          <textarea id="c-prompt" rows="5" placeholder="1girl, solo, cat ears, forest, night ..."></textarea>
+        </div>
+        <div class="field">
+          <div class="lbl">Negative <em><select id="c-negpre" style="width:auto;padding:3px 6px;font-size:11px"><option value="">NEG PRESETS</option><option value="pony">Pony default</option><option value="anime">Anime</option><option value="realistic">Realistic</option></select></em></div>
+          <textarea id="c-neg" rows="3"></textarea>
+        </div>
+        <div class="field"><label for="c-size">Size</label><select id="c-size"></select>
+          <div class="grid2" id="c-custom" hidden><input type="number" class="num" id="c-w" min="256" max="2048" step="64" value="1024" aria-label="Width"><input type="number" class="num" id="c-h" min="256" max="2048" step="64" value="1024" aria-label="Height"></div>
+        </div>
+        <div class="sl" data-id="c-steps" data-label="Steps" data-min="1" data-max="80" data-step="1" data-val="28"></div>
+        <div class="sl" data-id="c-cfg" data-label="CFG" data-min="1" data-max="20" data-step="0.5" data-val="6"></div>
+        <div class="grid2">
+          <div class="field"><label for="c-sampler">Sampler</label><select id="c-sampler"></select></div>
+          <div class="field"><label for="c-seed">Seed</label>
+            <div class="hrow" style="flex-wrap:nowrap"><input type="number" class="num" id="c-seed" value="-1" step="1"><button class="btn sm" id="c-dice" type="button" title="Random (-1)">&#9856;</button><button class="btn sm" id="c-recycle" type="button" title="Reuse last seed">&#8635;</button></div></div>
+        </div>
+        <div class="sl" data-id="c-batch" data-label="Batch" data-min="1" data-max="4" data-step="1" data-val="1"></div>
+        <div class="sl" data-id="c-clip" data-label="Clip skip" data-min="1" data-max="4" data-step="1" data-val="1"></div>
+        <div class="field"><label for="c-vae">VAE</label><select id="c-vae"></select></div>
+        <label class="tog" for="c-pony"><span>Pony score tags</span><input type="checkbox" id="c-pony"></label>
+        <div class="field"><div class="lbl">img2img</div>
+          <div class="drop" data-drop="c-init">Drop an image or click</div>
+          <div class="sl" data-id="c-str" data-label="Strength" data-min="0.05" data-max="1" data-step="0.05" data-val="0.6"></div>
+        </div>
+      </div>
+      <div class="col right">
+        <div class="stage" id="c-stage"><div class="ph">No image yet<br>Ctrl+Enter to generate</div></div>
+        <div class="thumbs" id="c-thumbs"></div>
+        <div class="prog"><div class="meter"><i id="c-bar"></i></div><div class="pt" id="c-pct"></div></div>
+        <div class="acts">
+          <button class="btn pri" id="c-go" type="button">GENERATE</button>
+          <button class="btn" id="c-cancel" type="button" disabled>CANCEL</button>
+          <button class="btn" id="c-save" type="button" disabled>SAVE AS</button>
+          <button class="btn" id="c-reuse" type="button" disabled>REUSE PARAMS</button>
+          <button class="btn" id="c-tomotion" type="button" disabled>TO MOTION</button>
+          <button class="btn" id="c-todata" type="button" disabled>SEND TO DATASET</button>
+        </div>
+        <div class="why" id="c-why"></div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ================= MODELS ================= -->
+  <section class="win" id="sec-models" hidden>
+    <header class="wh"><span class="wt">MODELS</span><span class="wsub">One-click downloads</span><span class="wrule"></span><span class="chip dim" id="d-free"></span></header>
+    <div class="wc">
+      <div class="lbl">Checkpoints <em>pick one to start creating</em></div>
+      <div class="cards mcards" id="d-ckpt"></div>
+      <div class="lbl">Video</div>
+      <div class="cards mcards" id="d-video"></div>
+      <div class="lbl">Extras <em>VAE and auto-taggers</em></div>
+      <div class="cards mcards" id="d-extra"></div>
+      <div class="lbl">Import <em>.safetensors only</em></div>
+      <div class="split" style="flex:none">
+        <div style="display:grid;gap:10px;align-content:start">
+          <div class="hrow" style="flex-wrap:nowrap"><input type="text" id="d-url" placeholder="paste a Hugging Face, Civitai or direct .safetensors link">
+            <select id="d-kind" style="width:auto" aria-label="Kind"><option value="checkpoint">checkpoint</option><option value="lora">lora</option><option value="vae">vae</option></select>
+            <button class="btn pri" id="d-import" type="button">IMPORT</button></div>
+          <div class="prog"><div class="meter"><i id="di-bar"></i></div><div class="pt" id="di-pct"></div></div>
+          <p class="note">Civitai links need an API token for most files: add it in SETTINGS.</p>
+        </div>
+        <div class="drop" id="d-drop">Drop .safetensors files here or click</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MOTION ================= -->
+  <section class="win" id="sec-motion" hidden>
+    <header class="wh"><span class="wt">MOTION</span><span class="wsub">Video generation</span><span class="wrule"></span></header>
+    <div class="wc fit"><div class="empty" id="m-empty" hidden></div><div class="cols">
+      <div class="col">
+        <div class="field"><label for="m-model">Model</label><select id="m-model"></select></div>
+        <div class="field"><label for="m-prompt">Prompt</label><textarea id="m-prompt" rows="5" placeholder="a cat walking through falling snow, cinematic"></textarea></div>
+        <div class="field"><label for="m-neg">Negative</label><textarea id="m-neg" rows="3"></textarea></div>
+        <div class="field"><label for="m-size">Size</label><select id="m-size">
+          <option value="832x480">832 x 480</option><option value="480x832">480 x 832</option><option value="640x640">640 x 640</option></select></div>
+        <div class="grid2">
+          <div class="field"><label for="m-frames">Frames</label><select id="m-frames"><option>33</option><option selected>49</option><option>81</option></select></div>
+          <div class="field"><label for="m-fps">FPS</label><input type="number" class="num" id="m-fps" min="4" max="60" value="16"></div>
+        </div>
+        <div class="sl" data-id="m-steps" data-label="Steps" data-min="1" data-max="60" data-step="1" data-val="30"></div>
+        <div class="sl" data-id="m-cfg" data-label="CFG" data-min="1" data-max="15" data-step="0.5" data-val="5"></div>
+        <div class="field"><label for="m-seed">Seed</label>
+          <div class="hrow" style="flex-wrap:nowrap"><input type="number" class="num" id="m-seed" value="-1" step="1"><button class="btn sm" id="m-dice" type="button" title="Random (-1)">&#9856;</button></div></div>
+        <div class="field"><div class="lbl">Init image (optional, I2V)</div><div class="drop" data-drop="m-init">Drop an image or click</div></div>
+      </div>
+      <div class="col right">
+        <div class="stage" id="m-stage"><div class="ph">No video yet<br>Ctrl+Enter to generate</div></div>
+        <div class="prog"><div class="meter"><i id="m-bar"></i></div><div class="pt" id="m-pct"></div></div>
+        <div class="acts">
+          <button class="btn pri" id="m-go" type="button">GENERATE</button>
+          <button class="btn" id="m-cancel" type="button" disabled>CANCEL</button>
+          <button class="btn" id="m-save" type="button" disabled>SAVE AS</button>
+        </div>
+        <div class="why" id="m-why"></div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ================= LORA ================= -->
+  <section class="win" id="sec-lora" hidden>
+    <header class="wh"><span class="wt">LORA</span><span class="wsub">Train your own LoRA</span><span class="wrule"></span><span class="chip dim" id="l-ready"></span></header>
+    <div class="wc">
+        <div class="banner" id="l-setup" hidden>
+          <b>Training is not set up</b>
+          <span>The training environment is missing. Run this in the nekostudio folder, then restart:</span>
+          <div class="cmd"><code id="l-cmd"></code><button class="btn sm" id="l-cmdcopy" type="button">COPY</button></div>
+        </div>
+      <div id="l-simple" class="stp" style="flex:none">
+        <div class="grid2" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+          <div class="field"><label for="q-name">LoRA name <span class="mute">(also the trigger word)</span></label><input type="text" id="q-name" list="q-ds" placeholder="my_character" autocomplete="off"><datalist id="q-ds"></datalist>
+            <div class="mono mute" style="font-size:11px">Trigger word: <b id="q-trig" style="color:var(--accent)">-</b></div></div>
+          <div class="field"><label for="q-base">Base model</label><select id="q-base"></select></div>
+        </div>
+        <div class="lbl">What are you teaching it?</div>
+        <div class="cards" id="q-types">
+          <button class="card sel" data-type="character" type="button"><b>CHARACTER</b><span>One person or character. Learns the face, hair and usual outfit.</span></button>
+          <button class="card" data-type="style" type="button"><b>STYLE</b><span>An art style or look that then applies to anything you prompt.</span></button>
+          <button class="card" data-type="concept" type="button"><b>OUTFIT / THING</b><span>A piece of clothing, object or pose the base model does not know.</span></button>
+        </div>
+        <div class="lbl">Pictures <em id="q-count"></em></div>
+        <div class="drop big" data-drop="q-files" data-multi="1">Drop your pictures here or click (15 to 40 works best)</div>
+        <div class="why" id="q-warn"></div>
+        <div class="qthumbs" id="q-thumbs"></div>
+        <div class="acts">
+          <button class="btn pri" id="q-train" type="button">TRAIN</button>
+          <button class="btn" id="q-stop" type="button" disabled>CANCEL</button>
+          <button class="btn sm" id="l-more" type="button" aria-expanded="false">EDIT TAGS / ADVANCED</button>
+        </div>
+        <div class="why" id="q-why"></div>
+        <div class="prog"><div class="meter"><i id="q-bar"></i></div><div class="pt" id="q-pct"></div></div>
+        <div class="samples" id="q-samples"></div>
+        <div class="acts" id="q-done" hidden><span class="mono" id="q-donetxt" style="color:var(--ok);font-size:12px;align-self:center"></span><button class="btn pri" id="q-try" type="button">TRY IT</button></div>
+      </div>
+
+      <div id="l-wizard" hidden>
+      <div class="steps" id="l-steps">
+        <button data-step="1" class="on"><b>01</b>DATASET</button>
+        <button data-step="2"><b>02</b>CAPTIONS</button>
+        <button data-step="3"><b>03</b>TRAIN</button>
+      </div>
+
+      <div class="stp" id="l-s1">
+        <div class="split">
+          <div style="display:grid;gap:12px;align-content:start">
+            <div class="lbl">Datasets <em id="l-dscount"></em></div>
+            <div class="list" id="l-dslist"></div>
+            <div class="hrow" style="flex-wrap:nowrap"><input type="text" id="l-newname" placeholder="new dataset name"><button class="btn" id="l-create" type="button">CREATE</button></div>
+          </div>
+          <div style="display:grid;gap:12px;align-content:start">
+            <div class="lbl">Images <em id="l-count"></em></div>
+            <div class="drop" data-drop="l-files" data-multi="1">Drop images here or click to upload</div>
+            <div class="why" id="l-warn"></div>
+            <div class="acts"><button class="btn pri" id="l-next1" type="button" disabled>NEXT: CAPTIONS</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stp" id="l-s2" hidden>
+        <div class="grid2" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+          <div class="field"><label for="l-trigger">Trigger word</label><input type="text" id="l-trigger" placeholder="e.g. mychar"></div>
+          <div class="sl" data-id="l-thresh" data-label="Tag threshold" data-min="0.1" data-max="0.9" data-step="0.05" data-val="0.35"></div>
+          <label class="tog" for="l-over" style="align-self:end"><span>Overwrite captions</span><input type="checkbox" id="l-over"></label>
+        </div>
+        <div class="hrow">
+          <button class="btn pri" id="l-auto" type="button">AUTO-CAPTION</button>
+          <input type="text" id="l-tag" placeholder="tag" style="width:160px">
+          <button class="btn sm" id="l-tagadd" type="button">ADD TO ALL</button>
+          <button class="btn sm" id="l-tagdel" type="button">REMOVE FROM ALL</button>
+          <span class="mono mute" id="l-capstat" style="font-size:11px"></span>
+        </div>
+        <div class="prog"><div class="meter"><i id="k-bar"></i></div><div class="pt" id="k-pct"></div></div>
+        <div class="dgrid" id="l-cards"></div>
+        <div class="acts"><button class="btn" id="l-back2" type="button">BACK</button><button class="btn pri" id="l-next2" type="button">NEXT: TRAIN</button></div>
+      </div>
+
+      <div class="stp" id="l-s3" hidden>
+        <div class="grid2" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+          <div class="field"><label for="l-name">LoRA name</label><input type="text" id="l-name" placeholder="my_character_v1"></div>
+          <div class="field"><label for="l-base">Base checkpoint</label><select id="l-base"></select></div>
+        </div>
+        <div class="lbl">Preset</div>
+        <div class="cards" id="l-presets">
+          <button class="card sel" data-preset="character" type="button"><b>CHARACTER</b><span>One person or character. Learns the face, hair and outfit.</span></button>
+          <button class="card" data-preset="style" type="button"><b>STYLE</b><span>An art style or look. Applies to anything you prompt.</span></button>
+          <button class="card" data-preset="concept" type="button"><b>CONCEPT</b><span>A pose, object or idea that the base model does not know.</span></button>
+        </div>
+        <label class="tog" for="l-adv"><span>ADVANCED</span><input type="checkbox" id="l-adv"></label>
+        <div class="grid2" id="l-advbox" hidden style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr))">
+          <div class="field"><label for="l-dim">Dim</label><input type="number" class="num" id="l-dim" min="1"></div>
+          <div class="field"><label for="l-alpha">Alpha</label><input type="number" class="num" id="l-alpha" min="1"></div>
+          <div class="field"><label for="l-lr">LR</label><input type="text" class="num" id="l-lr"></div>
+          <div class="field"><label for="l-epochs">Epochs</label><input type="number" class="num" id="l-epochs" min="1"></div>
+          <div class="field"><label for="l-repeats">Repeats</label><input type="number" class="num" id="l-repeats" min="1"></div>
+          <div class="field"><label for="l-res">Resolution</label><input type="number" class="num" id="l-res" min="256" step="64"></div>
+        </div>
+        <div class="acts">
+          <button class="btn" id="l-back3" type="button">BACK</button>
+          <button class="btn pri" id="l-train" type="button">TRAIN</button>
+          <button class="btn" id="l-stop" type="button" disabled>CANCEL</button>
+        </div>
+        <div class="why" id="l-why"></div>
+        <div class="prog"><div class="meter"><i id="t-bar"></i></div><div class="pt" id="t-pct"></div></div>
+        <div class="lbl">Loss <em id="l-lossnow"></em></div>
+        <svg class="spark" id="l-spark" viewBox="0 0 300 60" preserveAspectRatio="none" aria-label="Loss"><polyline points=""/></svg>
+        <div class="samples" id="l-samples"></div>
+        <div class="why" id="l-done" style="color:var(--ok)"></div>
+      </div>
+      </div>
+
+      <div class="lbl">Import LoRA <em>.safetensors only</em></div>
+      <div class="split" style="flex:none">
+        <div class="drop" id="li-drop">Drop .safetensors LoRAs here or click</div>
+        <div style="display:grid;gap:10px;align-content:start">
+          <div class="hrow" style="flex-wrap:nowrap"><input type="text" id="li-url" placeholder="paste a Hugging Face or Civitai link"><button class="btn pri" id="li-go" type="button">IMPORT LORA</button></div>
+          <div class="prog"><div class="meter"><i id="li-bar"></i></div><div class="pt" id="li-pct"></div></div>
+        </div>
+      </div>
+      <div class="lbl">Installed LoRAs <em id="li-count"></em></div>
+      <div class="list" id="li-list"></div>
+    </div>
+  </section>
+
+  <!-- ================= TRANSLATE ================= -->
+  <section class="win" id="sec-translate" hidden>
+    <header class="wh"><span class="wt">TRANSLATE</span><span class="wsub">GPT prose &rarr; Pony tags</span><span class="wrule"></span></header>
+    <div class="wc fit"><div class="cols" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
+      <div class="col">
+        <div class="lbl">Prose</div>
+        <textarea id="t-text" rows="10" style="flex:1;min-height:160px" placeholder="A beautiful young woman with long blonde hair and blue eyes, wearing a red dress, smiling at the viewer in a moonlit forest. Highly detailed, anime style."></textarea>
+        <div class="hrow"><span class="mono mute" style="font-size:10px;letter-spacing:.18em">MODE</span>
+          <div class="seg" id="t-mode"><button type="button" data-v="rules" class="on">RULES</button><button type="button" data-v="llm">LLM</button></div></div>
+        <div class="grid2">
+          <div class="field"><label for="t-source">Source</label><select id="t-source"><option value="anime">anime</option><option value="cartoon">cartoon</option><option value="furry">furry</option><option value="pony">pony</option><option value="realistic">realistic</option></select></div>
+          <div class="field"><label for="t-rating">Rating</label><select id="t-rating"><option value="safe">safe</option><option value="questionable">questionable</option><option value="explicit">explicit</option></select></div>
+        </div>
+        <div class="acts"><button class="btn pri" id="t-go" type="button">TRANSLATE</button></div>
+        <div class="why" id="t-note"></div>
+      </div>
+      <div class="col">
+        <div class="field"><div class="lbl">Prompt</div><textarea id="t-prompt" rows="5"></textarea></div>
+        <div class="field"><div class="lbl">Negative</div><textarea id="t-neg" rows="3"></textarea></div>
+        <div class="lbl">Tags <em class="mute">click to remove</em></div>
+        <div class="tags" id="t-tags"></div>
+        <div class="lbl">Dropped</div>
+        <div class="dropped" id="t-dropped">-</div>
+        <div class="acts"><button class="btn" id="t-copy" type="button">COPY</button><button class="btn pri" id="t-use" type="button">USE IN CREATE</button></div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ================= GALLERY ================= -->
+  <section class="win" id="sec-gallery" hidden>
+    <header class="wh"><span class="wt">GALLERY</span><span class="wsub" id="g-sub">Outputs</span><span class="wrule"></span>
+      <div class="seg" id="g-tabs"><button type="button" data-v="image" class="on">IMAGES</button><button type="button" data-v="video">VIDEOS</button></div></header>
+    <div class="wc">
+      <div class="gal" id="g-grid"></div>
+      <div class="acts"><button class="btn" id="g-more" type="button" hidden>LOAD MORE</button></div>
+      <div class="note" id="g-empty" hidden>Nothing here yet.</div>
+    </div>
+    <aside class="fly" id="g-fly" hidden></aside>
+  </section>
+
+  <!-- ================= SETTINGS ================= -->
+  <section class="win" id="sec-settings" hidden>
+    <header class="wh"><span class="wt">SETTINGS</span><span class="wsub">Look &amp; system</span><span class="wrule"></span></header>
+    <div class="wc">
+      <div class="lbl">Skin</div><div class="skins" id="s-skins"></div>
+      <div class="lbl">Accent</div>
+      <div class="swatches" id="s-acc"></div>
+      <label class="tog" for="s-motion"><span>Motion (window and toast animation)</span><input type="checkbox" id="s-motion"></label>
+
+      <div class="lbl">LLM endpoint (for Translate &rarr; LLM)</div>
+      <div class="grid2" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+        <div class="field"><label for="s-url">Base URL</label><input type="url" id="s-url" placeholder="http://127.0.0.1:11434/v1"></div>
+        <div class="field"><label for="s-model">Model</label><input type="text" id="s-model" placeholder="llama3.1"></div>
+        <div class="field"><label for="s-key">API key</label><input type="password" id="s-key" autocomplete="off"></div>
+        <div class="field"><label for="s-civ">Civitai API token <span class="mute">(for Civitai imports)</span></label><input type="password" id="s-civ" autocomplete="off"></div>
+        <div class="field"><label for="s-vram">VRAM mode</label><select id="s-vram"><option value="auto">auto</option><option value="low">low</option><option value="high">high</option></select></div>
+      </div>
+      <div class="field"><label for="s-defneg">Default negative prompt</label><textarea id="s-defneg" rows="3"></textarea></div>
+      <div class="acts"><button class="btn pri" id="s-save" type="button">SAVE SETTINGS</button></div>
+
+      <div class="lbl">Paths</div>
+      <dl class="kv" id="s-paths"></dl>
+      <p class="note">To open the data folder, browse to the path above in your file manager. Set the NEKOSTUDIO_HOME environment variable before starting to move it.</p>
+    </div>
+  </section>
+
+  <dialog id="dlg"><form method="dialog" id="dlg-form">
+    <div class="lbl">Send to dataset</div>
+    <div class="field"><label for="dlg-sel">Existing dataset</label><select id="dlg-sel"></select></div>
+    <div class="field"><label for="dlg-new">Or new dataset</label><input type="text" id="dlg-new" placeholder="name"></div>
+    <div class="hrow" style="justify-content:flex-end"><button class="btn" value="cancel" type="submit">CANCEL</button><button class="btn pri" value="ok" type="submit">SEND</button></div>
+  </form></dialog>
+
+  <div id="toasts" aria-live="polite"></div>
+  <div id="ticker"><div class="k">NEKO</div><div class="m" id="tickm">connecting ...</div></div>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

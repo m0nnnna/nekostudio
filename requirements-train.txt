@@ -1,0 +1,2 @@
+# Extra packages for the separate .venv-train (kohya sd-scripts brings its own requirements.txt)
+bitsandbytes

@@ -1,0 +1,70 @@
+# NekoStudio
+
+A local AI art studio in one Python server and one browser UI: image generation (SDXL, Pony,
+Illustrious, SD1.5), video generation (Wan 2.1), easy LoRA training, negative prompt presets and a
+GPT-prose to Pony-tags translator. Runs on Ubuntu and Windows with an NVIDIA GPU (built for 12 GB
+VRAM). MIT licence.
+
+## Setup
+
+Ubuntu 22.04+:
+
+    ./setup.sh            # add --no-train to skip the LoRA trainer
+    ./run.sh              # opens http://127.0.0.1:7860
+
+Windows 10/11 (needs git and ffmpeg, e.g. `winget install Git.Git Gyan.FFmpeg`):
+
+    setup.bat             # add -NoTrain via: powershell -File setup.ps1 -NoTrain
+    run.bat
+
+Setup creates `.venv` (Python 3.12, torch CUDA 12.8) via `uv`, and for training a separate
+`.venv-train` with kohya sd-scripts in `vendor/`. Re-running setup updates everything. The server
+itself starts without a GPU or models; `/api/status` shows what is missing.
+
+## Getting started
+
+1. Run the setup script (see Setup above) and start the app (`./run.sh` or `run.bat`).
+2. Open http://127.0.0.1:7860 and go to MODELS.
+3. Click DOWNLOAD on Pony Diffusion V6 XL (about 7 GB). You can keep working while it downloads.
+4. Go to CREATE, type a prompt, press GENERATE.
+
+## Models
+
+MODELS has one-click downloads (Pony, Illustrious, NoobAI, Animagine, SDXL, a realistic model, the Wan video
+model, a VAE and the auto-taggers). Downloads resume after a cancel or a crash. You can also import your own
+`.safetensors` by dropping files or pasting a Hugging Face / Civitai link (Civitai usually needs an API token,
+set it in SETTINGS). Pickle files (`.ckpt`, `.pt`) are refused.
+
+Data lives in `./data` (override with env `NEKOSTUDIO_HOME`).
+
+- Checkpoints (`.safetensors`): `data/models/checkpoints/`
+- LoRAs: `data/models/loras/` (trained LoRAs land here)
+- VAEs: `data/models/vae/`
+
+Video models are Hugging Face repos listed in settings, downloaded on first use to `data/hf/`.
+Filenames containing "pony" turn on Pony mode (score tags, clip skip 2).
+
+## Features
+
+- CREATE: txt2img / img2img, LoRA stack with weights, samplers, seed, batch, clip skip, VAE.
+- MOTION: Wan 2.1 text-to-video and image-to-video.
+- MODELS: one-click model downloads and `.safetensors` import. LORA: one screen (name, type, pictures, TRAIN), LoRA import and delete.
+- TRANSLATE: prose to Pony tags. GALLERY and SETTINGS (skins, accents, LLM endpoint).
+
+## Pony translator
+
+Rules mode is offline: it drops filler ("a", "beautiful", "highly detailed"), maps about 500
+phrases to booru tags, builds colour + garment/hair/eye tags, and orders the result as score tags,
+source, rating, character count, rest. The rating is whatever you pick (default safe). It also
+returns a suggested negative prompt and the words it dropped. LLM mode sends the text to any
+OpenAI-compatible endpoint (OpenAI, OpenRouter, Ollama `http://127.0.0.1:11434/v1`, LM Studio) and
+falls back to rules if the call fails. Self-test: `python -m nekostudio.prompts.pony`.
+
+## Training a LoRA
+
+1. LORA: type a name (it is also the trigger word), pick CHARACTER, STYLE or OUTFIT / THING, pick the base model
+   and drop in 15 to 40 pictures.
+2. Press TRAIN. It tags the pictures (WD14) and trains; progress and loss stream live.
+3. Press TRY IT: CREATE opens with the LoRA at 0.8 and the trigger word in the prompt.
+
+EDIT TAGS / ADVANCED opens the old wizard (caption editor, bulk tag edits, dim/alpha/lr/epochs/repeats).
