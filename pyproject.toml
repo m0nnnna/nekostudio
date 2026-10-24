@@ -1,6 +1,6 @@
 [project]
 name = "nekostudio"
-version = "0.1.0"
+version = "0.1.1"
 description = "Local AI art studio: image + video generation, LoRA training, Pony prompt translator"
 readme = "README.md"
 license = { text = "MIT" }
