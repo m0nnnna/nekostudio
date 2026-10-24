@@ -115,7 +115,7 @@ def _auth_error(r: httpx.Response, url: str):
 def fetch(job: Job, url: str, folder: Path, headers: dict | None = None, name: str = "", hint: str = "",
           safetensors_only: bool = True) -> Path:
     """Download `url` into `folder`, resuming a previous `.part`. Returns the final path."""
-    headers = dict(headers or {})
+    headers = {"Accept-Encoding": "identity", **(headers or {})}   # byte counts must match content-length
     client = httpx.Client(follow_redirects=True, timeout=httpx.Timeout(30.0, read=60.0),
                           headers={"User-Agent": "nekostudio"})
     try:
@@ -245,8 +245,10 @@ def _snapshot(job: Job, entry: dict):
 def _run_catalog(job: Job, entry: dict):
     try:
         if entry["file"]:
-            url = f"https://huggingface.co/{entry['repo']}/resolve/main/{entry['file']}"
-            dest = fetch(job, url, catalog.KIND_DIRS[entry["kind"]], name=entry.get("dest") or entry["file"].split("/")[-1])
+            url = entry.get("url") or f"https://huggingface.co/{entry['repo']}/resolve/main/{entry['file']}"
+            # one stream, one file at a time (the "dl" lane is single-threaded); only checkpoints are safetensors
+            dest = fetch(job, url, catalog.KIND_DIRS[entry["kind"]], name=entry.get("dest") or entry["file"].split("/")[-1],
+                         safetensors_only=entry["kind"] in ("checkpoint", "lora", "vae"))
         else:
             _snapshot(job, entry)
             dest = None

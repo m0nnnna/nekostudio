@@ -23,8 +23,13 @@ nekostudio/
     engine/video.py                # diffusers Wan2.1 T2V / I2V
     lora/dataset.py                # dataset folders, upload, auto-caption (WD14 tagger), caption edit
     lora/train.py                  # builds kohya sd-scripts TOML + launches it in the training venv
-    prompts/pony.py                # rule-based prose → Pony tags
-    prompts/llm.py                 # optional LLM translation via any OpenAI-compatible endpoint
+    prompts/tagdb.py               # booru tag dictionary (danbooru + e621 lists): normalise / lookup / category
+    prompts/local_llm.py           # local GGUF translator (llama.cpp, CPU by default, idle unload)
+    prompts/llm.py                 # shared system prompt / few-shots / JSON schema + OpenAI-compatible endpoint
+    prompts/postproc.py            # tagdb validation, fixes, count inference, ordering (all engines)
+    prompts/pony.py                # rules fallback: dictionary n-gram matcher (phrases.py = curated phrase table)
+    prompts/translate.py           # mode dispatch: auto | local | rules | remote
+    tests/eval_translate.py        # scores a mode against tests/translate_eval.json
   web/  index.html  style.css  app.js   # no build step, no framework, no CDN at runtime except Google Fonts (with local fallbacks)
   docs/SPEC.md
 ```
@@ -88,26 +93,40 @@ data/hf/                   HF_HOME (model downloads)
 - Auto-caption: WD14 tagger ONNX (`SmilingWolf/wd-eva02-large-tagger-v3`, fall back to
   `SmilingWolf/wd-vit-tagger-v3`) via onnxruntime-gpu (CPU fallback), threshold 0.35, booru tags
   with underscores → spaces, which is exactly the Pony tag style. Optional prefix trigger word.
-- Prose → Pony (`prompts/pony.py`, no network): lowercase, split on `,` `.` `;` ` and ` ` with `,
-  drop articles/filler ("a", "an", "the", "there is", "image of", "picture of", "showing",
-  "featuring", "beautiful"→ keep as tag only if in a small adjective whitelist), map a phrase
-  table (≥150 entries) of common prose → booru tags, e.g. "a girl/woman" → `1girl`, "two girls"
-  → `2girls`, "a man" → `1boy`, "alone" → `solo`, "looking at the viewer" → `looking at viewer`,
-  "smiling" → `smile`, "long blonde hair" → `long hair, blonde hair`, "blue eyes" → `blue eyes`,
-  "at night" → `night`, "in a forest" → `forest, outdoors`, "close-up" → `close-up`,
-  "from above" → `from above`, "full body shot" → `full body`, colour+garment
-  ("red dress" → `red dress`), "cat ears", "highly detailed" → (dropped, Pony uses score tags),
-  "anime style" → `anime`, "photorealistic" → `realistic, photorealistic`, etc. Add `solo` when
-  exactly one character and no other people. Output order: score tags, source tag
-  (`source_anime` / `source_cartoon` / `source_furry` / `source_pony` / realistic gets none),
-  rating tag (`rating_safe` default, `rating_questionable`, `rating_explicit` — chosen by user,
-  never guessed upward), character count, then the rest, deduped. Also returns a suggested
-  negative prompt. Return `{"prompt", "negative", "tags": [...], "dropped": [...]}`.
-- LLM mode (`prompts/llm.py`): POST to `{base_url}/chat/completions` (OpenAI-compatible: OpenAI,
-  OpenRouter, Ollama `http://127.0.0.1:11434/v1`, LM Studio) with a system prompt that teaches
-  Pony format; settings hold base_url, model, api_key (stored only in data/settings.json). Uses
-  `httpx`. Result is post-processed by the same normaliser as the rule-based path. If it fails,
-  fall back to rule-based and say so in `note`.
+- Prose → Pony is a translation layer with one tag vocabulary. Every tag that leaves any engine
+  has been checked against `prompts/tagdb.py`, never invented.
+  - **Tag dictionary** (`tagdb.py`): the a1111-tagcomplete lists `tags/danbooru.csv` and `tags/e621.csv`
+    (`name,type,count,"alias1,alias2"`, DominikDoom/a1111-sd-webui-tagcomplete) downloaded through
+    the catalog (kind `tags`, folder `<models>/tags`); falls back to the WD tagger's `selected_tags.csv`
+    from the HF cache. Lazy, cached in memory. `normalise` (lowercase, `_`→space, strips weights and
+    escapes, keeps `name (series)`), `lookup` (exact → alias → plural/singular → word-order swap →
+    fuzzy difflib ≥ 0.9 on tags with count ≥ 50) and `category` (general / character / copyright /
+    artist / meta / species). Tags use spaces; `score_9`-style tags are left alone.
+  - **Local LLM** (`local_llm.py`): llama-cpp-python (prebuilt CPU wheels), default model
+    `unsloth/Qwen3-4B-Instruct-2507-GGUF` `Qwen3-4B-Instruct-2507-Q4_K_M.gguf` (2.5 GB, catalog kind
+    `llm`, folder `<models>/llm`). `n_gpu_layers = settings.llm_gpu_layers` (default 0 = CPU, so SDXL keeps the VRAM;
+    -1 = all layers), threads = physical cores. Loads on first use, stays resident, unloads after 10 idle
+    minutes. The system prompt (what Pony tags are, count tags, splitting compounds, prose → tag
+    mappings, what to drop) plus 6 few-shot turns is a fixed prefix, so llama.cpp reuses its KV cache.
+    Output is constrained by a JSON schema to `{"characters": [], "tags": [], "rating_hint": ""}`, temperature 0.2.
+  - **Post-processing** (`postproc.py`, shared): each tag → `tagdb.lookup`; canonical tags kept, repaired
+    ones listed in `fixed` (`{from,to}`), unknown ones in `dropped` (reasons in `dropped_reasons`);
+    quality filler, vague words, person words, artist/meta tags and (at rating safe) explicit tags are
+    dropped; compounds are salvaged (`oversized armchair` → `armchair`); colour synonyms (`auburn hair` →
+    `brown hair`); the character count is checked/filled from the prose (`infer_count`); implied tags
+    (indoors/outdoors, `holding sword`, species ears/tail). Order: `score_9, score_8_up, score_7_up`,
+    source tag, rating tag (always the user's choice, never raised), count tags (+ `solo`), character /
+    copyright, the rest, deduped. Also returns a suggested negative prompt.
+  - **Rules fallback** (`pony.py` + `phrases.py`, used when no GGUF is installed): tokenise, compose
+    colour/length + hair/eyes, then greedy longest n-gram matching per position (curated phrase table first,
+    then the dictionary with simple -ing/-ed/-s lemmatisation; unigrams need count ≥ 500 and may not be
+    aliases of unrelated words); unmatched content words go to `dropped`, never emitted as fragments.
+  - **Remote** (`llm.py`): POST `{base_url}/chat/completions` (any OpenAI-compatible server) with the same
+    system prompt, few-shots, JSON schema (retried without it on HTTP 400) and the same post-processing.
+    On failure fall back to rules and say so in `note`.
+  - **Modes**: `auto` (default: local if the GGUF + runtime are installed, else rules), `local`, `rules`, `remote`.
+  - **Eval**: `python tests/eval_translate.py --mode local|rules` scores `tests/translate_eval.json`
+    (recall of `must` alternatives separated by `|`, hits of `must_not`). Targets: local ≥ 85 %, rules ≥ 55 %, zero `must_not` hits.
 
 ## REST API (all JSON, under /api)
 
@@ -128,7 +147,8 @@ data/hf/                   HF_HOME (model downloads)
 | GET `/api/events` | | Server-Sent Events: `data: <job json>` on every job change |
 | GET `/api/gallery` | `?kind=image\|video&offset&limit` | `{items:[{id, kind, url, thumb, meta, created}], total}` newest first |
 | DELETE `/api/gallery/{id}` | | `{ok}` |
-| POST `/api/translate` | `{text, mode:"rules"\|"llm", source:"anime"\|"cartoon"\|"furry"\|"pony"\|"realistic", rating:"safe"\|"questionable"\|"explicit"}` | `{prompt, negative, tags, dropped, note?}` |
+| POST `/api/translate` | `{text, mode:"auto"\|"local"\|"rules"\|"remote", source:"anime"\|"cartoon"\|"furry"\|"pony"\|"realistic", rating:"safe"\|"questionable"\|"explicit"}` | `{prompt, negative, tags, dropped, fixed:[{from,to}], engine, note?}` |
+| GET `/api/translate/status` | | `{local_ready, runtime, loaded, tags_ready, tag_sources, missing:[{id,label,size_gb}], missing_gb}` |
 | GET `/api/datasets` | | `[{name, images:int, captioned:int}]` |
 | POST `/api/datasets` | `{name}` | dataset |
 | POST `/api/datasets/{name}/upload` | multipart `files[]` | `{added}` |
@@ -182,14 +202,15 @@ canvas-drawn shard/hex pattern like the mockup's wallpaper (cheap, static, redra
   CAPTIONS · 03 TRAIN: caption editor, bulk tags, preset cards, dim/alpha/lr/epochs/repeats, loss sparkline).
   If `train_ready` is false show the exact setup command to run. Below: an IMPORT LORA strip (drop `.safetensors`
   or paste a link, `kind=lora`) and the list of installed LoRAs with DELETE.
-- TRANSLATE: two panes. Left: prose input (placeholder an example GPT prompt), mode toggle
-  RULES / LLM, source select, rating select. Right: resulting prompt + negative (editable),
-  tag chips (click to remove), dropped words in dim mono, COPY and USE IN CREATE buttons.
+- TRANSLATE: two panes. Left: prose input (placeholder an example GPT prompt), engine
+  selector AUTO / LOCAL / RULES / REMOTE, a "DOWNLOAD TRANSLATOR (x GB)" card while the GGUF or tag lists are missing
+  (queues the three catalog downloads one after another), source select, rating select. Right: resulting prompt + negative (editable),
+  tag chips (click to remove), fixed tags (from → to), dropped words in dim mono, COPY and USE IN CREATE buttons.
 - GALLERY: grid of images/videos, filter tabs IMAGES / VIDEOS, click → detail flyout with full
   meta, REUSE, DELETE, DOWNLOAD.
 - SETTINGS: skin (4 swatches) + accent presets (Ultimit's 8: Pink #ff3d7f, Vermilion #ff5a36,
   Gold #ffc23d, Acid #c6ff3d, Mint #3dffb0, Cyan #3dd8ff, Blue #4d7cff, Violet #a66bff) + custom,
-  motion on/off; paths (read-only display), LLM endpoint (base url, model, key), Civitai API token, VRAM mode
+  motion on/off; paths (read-only display), remote LLM endpoint (base url, model, key), local translator GPU layers (0 = CPU), Civitai API token, VRAM mode
   (auto/low/high), default negative prompt, "open data folder" hint.
 - Live updates via EventSource `/api/events`, falling back to polling `/api/jobs/{id}`.
 - Skin/accent stored in localStorage and in settings.

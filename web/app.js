@@ -475,7 +475,7 @@ async function toPony() {
   const text = v("c-prompt").trim();
   if (!text) return;
   try {
-    const r = await api("/translate", { method: "POST", json: { text, mode: tr.mode, source: v("t-source"), rating: v("t-rating") } });
+    const r = await api("/translate", { method: "POST", json: { text, mode: "auto", source: v("t-source"), rating: v("t-rating") } });
     cr.undo = { prompt: v("c-prompt"), negative: v("c-neg") };
     $("#c-undo").disabled = false;
     setv("c-prompt", r.prompt);
@@ -654,7 +654,7 @@ function modelCard(e) {
     + `<span>${esc(e.note)}</span><div class="mcs">${gbText(e.size_gb)}</div>${dlBox(e)}</div>`;
 }
 function renderModels() {
-  const groups = { "d-ckpt": e => e.kind === "checkpoint", "d-video": e => e.kind === "video", "d-extra": e => e.kind === "vae" || e.kind === "tagger" };
+  const groups = { "d-ckpt": e => e.kind === "checkpoint", "d-video": e => e.kind === "video", "d-extra": e => ["vae", "tagger", "tags", "llm"].includes(e.kind) };
   for (const [id, f] of Object.entries(groups)) $("#" + id).innerHTML = D.items.filter(f).map(modelCard).join("");
   const fr = $("#d-free");
   fr.textContent = D.free == null ? "" : `${D.free} GB FREE`;
@@ -1143,13 +1143,15 @@ function tryLora() {
 }
 
 /* ================= TRANSLATE ================= */
-const tr = { mode: "rules", tags: [] };
+const tr = { mode: "auto", tags: [], status: null };
 
 function initTranslate() {
   $$("#t-mode button").forEach(b => {
     b.onclick = () => { tr.mode = b.dataset.v; $$("#t-mode button").forEach(x => x.classList.toggle("on", x === b)); };
   });
   $("#t-go").onclick = runTranslate;
+  loadTrStatus();
+  $("#t-dl").addEventListener("click", ev => { if (ev.target.closest("[data-tr-dl]")) downloadTranslator(); });
   $("#t-copy").onclick = () => copyText(v("t-prompt"));
   $("#t-use").onclick = () => {
     if (!v("t-prompt").trim()) return;
@@ -1158,6 +1160,55 @@ function initTranslate() {
     go("create");
   };
 }
+// is the local translator (model + tag lists) installed? offer a one-click download when it is not
+async function loadTrStatus() {
+  try { tr.status = await api("/translate/status"); } catch { return; }
+  renderTrCard();
+}
+function renderTrCard() {
+  const st = tr.status, box = $("#t-dl");
+  if (!st || tr.dlBusy) return;
+  const need = st.missing || [];
+  box.hidden = !need.length;
+  if (!need.length) { box.innerHTML = ""; return; }
+  box.innerHTML = `<h3>Better translations</h3><p>Download the local translator (${esc(need.map(e => e.label).join(", "))}) to get real booru tags. It runs on the CPU, so it never competes with image generation.</p>`
+    + `<div class="acts"><button class="btn pri" data-tr-dl type="button">DOWNLOAD TRANSLATOR (${gbText(st.missing_gb)})</button></div>`;
+}
+// the three files go through the single download lane, one after another
+async function downloadTranslator() {
+  const st = tr.status;
+  if (!st || !st.missing.length) return;
+  tr.dlBusy = true;
+  const box = $("#t-dl");
+  box.innerHTML = '<h3>Downloading translator</h3><div class="meter"><i id="t-dlbar" style="width:0%"></i></div><div class="mono mute" id="t-dltxt" style="font-size:11px">starting ...</div>';
+  try {
+    const jobs = [];
+    for (const m of st.missing) {
+      const { job_id } = await api(`/catalog/${enc(m.id)}/download`, { method: "POST" });
+      jobs.push({ id: job_id, label: m.label });
+    }
+    const states = {};
+    await new Promise(res => {
+      jobs.forEach(j => watchers.set(j.id, job => {
+        states[j.id] = job;
+        const cur = jobs.find(x => !finished((states[x.id] || {}).state)) || jobs[jobs.length - 1];
+        const cj = states[cur.id] || job;
+        $("#t-dlbar") && ($("#t-dlbar").style.width = Math.round((cj.progress || 0) * 100) + "%");
+        $("#t-dltxt") && ($("#t-dltxt").textContent = `${cur.label}: ${cj.message || ""}`);
+        if (jobs.every(x => finished((states[x.id] || {}).state))) res();
+        return true;
+      }));
+      jobs.forEach(j => api(`/jobs/${j.id}`).then(dispatch).catch(() => {}));
+    });
+    const bad = Object.values(states).find(j => j.state === "error");
+    if (bad) toast("Download failed", bad.error || bad.message || "unknown error", true);
+    else toast("Translator", "Installed");
+  } catch (e) { fail("Download", e); }
+  tr.dlBusy = false;
+  await loadTrStatus(); await loadCatalog();
+}
+const trFixed = fx => (fx || []).map(f => `${esc(f.from)} \u2192 ${esc(f.to)}`).join(" | ") || "-";
+
 async function runTranslate() {
   const text = v("t-text").trim();
   if (!text) return;
@@ -1167,6 +1218,8 @@ async function runTranslate() {
     setv("t-prompt", r.prompt || ""); setv("t-neg", r.negative || "");
     tr.tags = r.tags || [];
     $("#t-dropped").textContent = (r.dropped || []).join(" | ") || "-";
+    $("#t-fixed").innerHTML = trFixed(r.fixed);
+    $("#t-engine").textContent = r.engine ? `engine: ${r.engine}` : "";
     $("#t-note").textContent = r.note || "";
     renderTags();
   } catch (e) { fail("Translate", e); }
@@ -1269,6 +1322,7 @@ function drawSettings() {
 function fillSettingsForm() {
   const s = S.settings, llm = s.llm || {};
   setv("s-url", llm.base_url ?? ""); setv("s-model", llm.model ?? ""); setv("s-key", llm.api_key ?? "");
+  setv("s-gpul", s.llm_gpu_layers ?? 0);
   setv("s-civ", s.civitai_token ?? ""); setv("s-vram", s.vram_mode || "auto"); setv("s-defneg", s.default_negative ?? "");
   const paths = s.paths && typeof s.paths === "object" ? Object.entries(s.paths) : [["data", "./data (or $NEKOSTUDIO_HOME)"]];
   $("#s-paths").innerHTML = paths.map(([k, val]) => `<dt>${esc(k)}</dt><dd class="mono">${esc(val)}</dd>`).join("");
@@ -1277,7 +1331,7 @@ async function saveSettings() {
   const next = {
     ...S.settings,
     llm: { ...(S.settings.llm || {}), base_url: v("s-url"), model: v("s-model"), api_key: v("s-key") },
-    civitai_token: v("s-civ"), vram_mode: v("s-vram"), default_negative: v("s-defneg"),
+    llm_gpu_layers: Math.trunc(n("s-gpul")), civitai_token: v("s-civ"), vram_mode: v("s-vram"), default_negative: v("s-defneg"),
     skin: look.skin, accent: look.accent, motion: look.motion
   };
   try { S.settings = await api("/settings", { method: "PUT", json: next }); fillSettingsForm(); toast("Settings", "Saved"); }

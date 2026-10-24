@@ -23,7 +23,7 @@ from .engine import video as video_engine
 from .jobs import jobs
 from .lora import dataset as ds
 from .lora import train as trainer
-from .prompts import llm, pony
+from .prompts import local_llm, pony, tagdb, translate as translator
 
 app = FastAPI(title="NekoStudio", version=__version__)
 
@@ -74,7 +74,7 @@ class VideoReq(_Base):
 
 class TranslateReq(_Base):
     text: str
-    mode: str = "rules"
+    mode: str = "auto"      # auto | local | rules | remote
     source: str = "anime"
     rating: str = "safe"
 
@@ -309,13 +309,17 @@ def gallery_delete(item_id: str):
 
 # ---- translate ------------------------------------------------------------------------------
 
+@app.get("/api/translate/status")
+def translate_status():
+    return translator.status()
+
+
 @app.post("/api/translate")
 def translate(req: TranslateReq):
-    source = req.source if req.source in pony.SOURCE_TAGS else "anime"
-    rating = req.rating if req.rating in pony.RATINGS else "safe"
-    if req.mode == "llm":
-        return llm.translate(req.text, source, rating, config.load_settings()["llm"])
-    return pony.translate(req.text, source, rating)
+    try:
+        return translator.translate(req.text, req.mode, req.source, req.rating)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(400, str(e))
 
 
 # ---- datasets / training --------------------------------------------------------------------

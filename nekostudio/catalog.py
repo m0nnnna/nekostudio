@@ -54,9 +54,24 @@ CATALOG: list[dict] = [
          only=["model.onnx", "selected_tags.csv"], check=["model.onnx", "selected_tags.csv"],
          note="Smaller, faster auto-captioner; the fallback when the large one is missing.",
          recommended=False),
+    dict(id="tags-danbooru", label="Danbooru tag list", kind="tags", family="pony",
+         repo="DominikDoom/a1111-sd-webui-tagcomplete", file="danbooru.csv",
+         url="https://raw.githubusercontent.com/DominikDoom/a1111-sd-webui-tagcomplete/main/tags/danbooru.csv",
+         size_gb=0.0035, note="Booru vocabulary with post counts and aliases; the translator only emits tags found here.",
+         recommended=True),
+    dict(id="tags-e621", label="e621 tag list", kind="tags", family="pony",
+         repo="DominikDoom/a1111-sd-webui-tagcomplete", file="e621.csv",
+         url="https://raw.githubusercontent.com/DominikDoom/a1111-sd-webui-tagcomplete/main/tags/e621.csv",
+         size_gb=0.0027, note="e621 vocabulary (species, anthro, furry tags) for the prompt translator.",
+         recommended=True),
+    dict(id="qwen3-4b-instruct", label="Qwen3 4B Instruct 2507 (Q4_K_M)", kind="llm", family="translator",
+         repo="unsloth/Qwen3-4B-Instruct-2507-GGUF", file="Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+         size_gb=2.5, note="Local prompt translator (runs on CPU via llama.cpp): turns plain-English prose into Pony booru tags.",
+         recommended=True),
 ]
 BY_ID = {e["id"]: e for e in CATALOG}
-KIND_DIRS = {"checkpoint": config.CHECKPOINTS, "vae": config.VAES, "lora": config.LORAS}
+KIND_DIRS = {"checkpoint": config.CHECKPOINTS, "vae": config.VAES, "lora": config.LORAS,
+             "tags": config.TAGS, "llm": config.LLMS}
 
 
 def target(entry: dict):

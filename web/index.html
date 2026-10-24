@@ -280,7 +280,9 @@
         <div class="lbl">Prose</div>
         <textarea id="t-text" rows="10" style="flex:1;min-height:160px" placeholder="A beautiful young woman with long blonde hair and blue eyes, wearing a red dress, smiling at the viewer in a moonlit forest. Highly detailed, anime style."></textarea>
         <div class="hrow"><span class="mono mute" style="font-size:10px;letter-spacing:.18em">MODE</span>
-          <div class="seg" id="t-mode"><button type="button" data-v="rules" class="on">RULES</button><button type="button" data-v="llm">LLM</button></div></div>
+          <div class="seg" id="t-mode"><button type="button" data-v="auto" class="on">AUTO</button><button type="button" data-v="local">LOCAL</button><button type="button" data-v="rules">RULES</button><button type="button" data-v="remote">REMOTE</button></div></div>
+        <div class="card" id="t-dl" hidden></div>
+        <div class="mono mute" id="t-engine" style="font-size:11px"></div>
         <div class="grid2">
           <div class="field"><label for="t-source">Source</label><select id="t-source"><option value="anime">anime</option><option value="cartoon">cartoon</option><option value="furry">furry</option><option value="pony">pony</option><option value="realistic">realistic</option></select></div>
           <div class="field"><label for="t-rating">Rating</label><select id="t-rating"><option value="safe">safe</option><option value="questionable">questionable</option><option value="explicit">explicit</option></select></div>
@@ -293,6 +295,8 @@
         <div class="field"><div class="lbl">Negative</div><textarea id="t-neg" rows="3"></textarea></div>
         <div class="lbl">Tags <em class="mute">click to remove</em></div>
         <div class="tags" id="t-tags"></div>
+        <div class="lbl">Fixed <em class="mute">from &rarr; to</em></div>
+        <div class="dropped" id="t-fixed">-</div>
         <div class="lbl">Dropped</div>
         <div class="dropped" id="t-dropped">-</div>
         <div class="acts"><button class="btn" id="t-copy" type="button">COPY</button><button class="btn pri" id="t-use" type="button">USE IN CREATE</button></div>
@@ -321,12 +325,13 @@
       <div class="swatches" id="s-acc"></div>
       <label class="tog" for="s-motion"><span>Motion (window and toast animation)</span><input type="checkbox" id="s-motion"></label>
 
-      <div class="lbl">LLM endpoint (for Translate &rarr; LLM)</div>
+      <div class="lbl">Remote LLM endpoint (for Translate &rarr; REMOTE, any OpenAI-compatible server)</div>
       <div class="grid2" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
         <div class="field"><label for="s-url">Base URL</label><input type="url" id="s-url" placeholder="http://127.0.0.1:11434/v1"></div>
         <div class="field"><label for="s-model">Model</label><input type="text" id="s-model" placeholder="llama3.1"></div>
         <div class="field"><label for="s-key">API key</label><input type="password" id="s-key" autocomplete="off"></div>
         <div class="field"><label for="s-civ">Civitai API token <span class="mute">(for Civitai imports)</span></label><input type="password" id="s-civ" autocomplete="off"></div>
+        <div class="field"><label for="s-gpul">Local translator GPU layers <span class="mute">(0 = CPU, -1 = all)</span></label><input type="number" id="s-gpul" min="-1" step="1" value="0"></div>
         <div class="field"><label for="s-vram">VRAM mode</label><select id="s-vram"><option value="auto">auto</option><option value="low">low</option><option value="high">high</option></select></div>
       </div>
       <div class="field"><label for="s-defneg">Default negative prompt</label><textarea id="s-defneg" rows="3"></textarea></div>

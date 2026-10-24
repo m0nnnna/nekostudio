@@ -1,0 +1,42 @@
+[
+  {
+    "text": "A cozy, cinematic illustration of a young witch with flowing auburn hair curled up in an oversized armchair by a crackling fireplace, reading an ancient leather-bound spellbook while her black cat sleeps on her lap. Warm golden light spills across the room, casting soft shadows on shelves crammed with potion bottles and dried herbs. Rain streaks down the tall arched window behind her.",
+    "must": ["1girl", "witch", "brown hair|red hair|auburn hair", "armchair", "fireplace", "reading", "book", "black cat", "indoors", "window", "rain", "bottle|potion"],
+    "must_not": ["hair", "flowing", "spills", "streaks down", "shelves crammed", "black cat sleeps", "behind", "cinematic"]
+  },
+  {
+    "text": "Create a dynamic action shot of a cyberpunk mercenary woman leaping between rooftops at night, neon signs reflecting off her chrome arm, katana drawn, long coat billowing behind her, rain-soaked city far below, dramatic low angle.",
+    "must": ["1girl", "solo", "cyberpunk", "jumping|midair", "rooftop", "night", "neon lights", "mechanical arms|prosthesis|cyborg", "katana", "holding sword|holding weapon|unsheathed", "long coat", "rain", "city", "from below"],
+    "must_not": ["create dynamic action", "off", "signs", "drawn", "far below", "soaked", "dramatic"]
+  },
+  {
+    "text": "A fluffy anthropomorphic fox girl barista smiling warmly as she hands a latte across the counter of a small sunlit café, wearing a green apron over a cream sweater, plants hanging from the ceiling.",
+    "must": ["1girl", "fox girl|anthro|furry female", "fox ears", "fox tail", "barista|waitress", "smile", "cup|coffee|latte", "counter", "cafe", "apron", "green apron", "sweater", "plant", "indoors", "sunlight"],
+    "must_not": ["hands latte", "small sunlit caf", "plants hanging", "fluffy", "warmly"]
+  },
+  {
+    "text": "Two teenage girls in sailor school uniforms sharing an umbrella on a rainy street in Tokyo, one with short black hair and glasses, the other with long pink twintails, both laughing, soft pastel colors, slice of life anime style.",
+    "must": ["2girls", "school uniform", "serafuku", "umbrella", "shared umbrella", "rain", "street", "black hair", "short hair", "glasses", "pink hair", "twintails", "long hair", "laughing|smile", "pastel colors"],
+    "must_not": ["1girl", "solo", "tokyo street", "the other", "both", "teenage"]
+  },
+  {
+    "text": "Portrait of a stoic elven knight in ornate silver plate armor standing in a misty pine forest at dawn, holding a glowing blue sword, his long platinum blonde hair blowing in the wind, pointed ears, piercing green eyes, highly detailed, 8k, masterpiece.",
+    "must": ["1boy", "solo", "elf", "knight", "pointy ears", "armor", "plate armor", "silver armor|armor", "forest", "fog", "dawn|morning", "holding sword", "glowing sword|glowing weapon|glowing", "blonde hair|platinum blonde hair", "long hair", "wind", "green eyes", "portrait|upper body"],
+    "must_not": ["1girl", "8k", "masterpiece", "highly detailed", "piercing", "stoic elven"]
+  },
+  {
+    "text": "An adorable chibi dragon curled up asleep on a pile of gold coins in a dark cave, little puffs of smoke coming from its nostrils, treasure chests and gems glittering around it.",
+    "must": ["dragon", "no humans", "chibi", "sleeping", "gold|gold coin|coin", "cave", "treasure chest", "gem", "smoke"],
+    "must_not": ["1girl", "1boy", "solo focus", "adorable", "nostrils", "little puffs"]
+  },
+  {
+    "text": "A woman lounging by an infinity pool at a luxury villa overlooking the ocean at sunset, wearing a white bikini and sunglasses pushed up on her head, sipping a cocktail, golden hour lighting, from above.",
+    "must": ["1girl", "solo", "pool", "ocean", "sunset", "bikini", "white bikini", "eyewear on head|sunglasses", "drinking glass|cocktail|holding cup", "lying|reclining|sitting", "from above", "outdoors"],
+    "must_not": ["luxury villa", "infinity", "pushed up", "golden hour lighting", "overlooking"]
+  },
+  {
+    "text": "Draw a cute wolf boy with grey fur and amber eyes wearing an oversized hoodie, sitting on his bed playing video games late at night, the room lit only by the monitor glow, messy room with snack wrappers.",
+    "must": ["1boy", "wolf boy|furry male|anthro", "wolf ears", "grey fur|furry", "yellow eyes|orange eyes|amber eyes", "hoodie", "oversized clothes", "sitting", "on bed", "playing games|video game|controller|holding controller", "night", "dark", "monitor|screen light", "messy room", "indoors"],
+    "must_not": ["draw", "cute wolf", "snack wrappers", "late", "only"]
+  }
+]

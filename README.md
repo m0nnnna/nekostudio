@@ -49,16 +49,25 @@ Filenames containing "pony" turn on Pony mode (score tags, clip skip 2).
 - CREATE: txt2img / img2img, LoRA stack with weights, samplers, seed, batch, clip skip, VAE.
 - MOTION: Wan 2.1 text-to-video and image-to-video.
 - MODELS: one-click model downloads and `.safetensors` import. LORA: one screen (name, type, pictures, TRAIN), LoRA import and delete.
-- TRANSLATE: prose to Pony tags. GALLERY and SETTINGS (skins, accents, LLM endpoint).
+- TRANSLATE: prose to Pony tags. GALLERY and SETTINGS (skins, accents, remote LLM endpoint, translator GPU layers).
 
 ## Pony translator
 
-Rules mode is offline: it drops filler ("a", "beautiful", "highly detailed"), maps about 500
-phrases to booru tags, builds colour + garment/hair/eye tags, and orders the result as score tags,
-source, rating, character count, rest. The rating is whatever you pick (default safe). It also
-returns a suggested negative prompt and the words it dropped. LLM mode sends the text to any
-OpenAI-compatible endpoint (OpenAI, OpenRouter, Ollama `http://127.0.0.1:11434/v1`, LM Studio) and
-falls back to rules if the call fails. Self-test: `python -m nekostudio.prompts.pony`.
+TRANSLATE turns GPT-style prose into real Pony/booru tags. Every tag is checked against the
+Danbooru and e621 tag lists (with post counts and aliases), so no invented fragments get through.
+
+- **Local** (best): a small instruct model (Qwen3 4B Instruct 2507, Q4_K_M, 2.5 GB) runs on the CPU through
+  llama.cpp, so it never takes VRAM from image generation (SETTINGS has "GPU layers" if you want it on the
+  GPU). Click DOWNLOAD TRANSLATOR on the TRANSLATE page (the model plus the two tag lists, about 2.5 GB,
+  fetched one file at a time). It loads on first use and frees its memory after 10 idle minutes.
+- **Rules**: offline fallback without a model; dictionary-based matching of phrases to tags.
+- **Remote**: any OpenAI-compatible endpoint (OpenAI, OpenRouter, Ollama `http://127.0.0.1:11434/v1`, LM Studio),
+  same prompt and the same tag checking.
+- **Auto** (default, also used by the CREATE "to Pony" button): local if installed, else rules.
+
+The result is ordered score tags, source, rating (always what you pick, default safe), character count,
+then the rest, plus a suggested negative prompt, the tags it repaired (`from -> to`) and the words it dropped.
+Check quality with `python tests/eval_translate.py --mode local` (or `rules`).
 
 ## Training a LoRA
 

@@ -29,6 +29,8 @@ MODELS = _models_root()
 CHECKPOINTS = MODELS / "checkpoints"
 LORAS = MODELS / "loras"
 VAES = MODELS / "vae"
+TAGS = MODELS / "tags"
+LLMS = MODELS / "llm"
 OUTPUTS = HOME / "outputs"
 IMAGES = OUTPUTS / "images"
 VIDEOS = OUTPUTS / "videos"
@@ -39,7 +41,7 @@ WEB_DIR = ROOT / "web"
 VENDOR = ROOT / "vendor"
 
 HOME.mkdir(parents=True, exist_ok=True)
-for _d in (CHECKPOINTS, LORAS, VAES, IMAGES, VIDEOS, DATASETS, TRAINING, HF_HOME):
+for _d in (CHECKPOINTS, LORAS, VAES, TAGS, LLMS, IMAGES, VIDEOS, DATASETS, TRAINING, HF_HOME):
     _d.mkdir(parents=True, exist_ok=True)
 
 # Model downloads (diffusers, WD14 tagger...) stay inside the data dir unless the user set their own.
@@ -59,6 +61,7 @@ DEFAULTS: dict = {
     "vram_mode": "auto",  # auto | low | high
     "default_negative": DEFAULT_NEGATIVE,
     "civitai_token": "",
+    "llm_gpu_layers": 0,   # local translator: 0 = CPU only (never fights SDXL for VRAM), -1 = all layers on GPU
     "llm": {"base_url": "http://127.0.0.1:11434/v1", "model": "", "api_key": ""},
     "video_models": [
         {"id": "Wan-AI/Wan2.1-T2V-1.3B-Diffusers", "label": "Wan 2.1 T2V 1.3B (480p, fits 12 GB)"},
