@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Update NekoStudio: newest release, or --edge for the newest commit of main. See --help.
+set -euo pipefail
+cd "$(dirname "$(readlink -f "$0")")"
+. ./nekoenv.sh
+py="$ENV_DIR/.venv/bin/python"
+[ -x "$py" ] || py=python3
+exec "$py" -I nekostudio/updater.py "$@"

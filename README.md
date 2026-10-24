@@ -38,6 +38,19 @@ stay on the share, so all PCs see the same studio.
 - If `models_dir` in `data/settings.json` points somewhere that doesn't exist on this PC (another OS's
   path, an unplugged drive), NekoStudio uses `data/models` instead and says so in the console.
 
+## Updating
+
+    nekostudio-update            # newest release
+    nekostudio-update --edge     # newest commit of main (test/edge PCs)
+    nekostudio-update --check    # only check: exit 0 = up to date, 10 = update waiting
+
+On Windows the same commands work in a new terminal after setup, or run `nekostudio-update.bat` in the
+install folder. Options: `--yes` (don't ask), `--branch NAME` (with --edge), `--force` (reinstall and re-run
+setup). Close NekoStudio first. Your `data/`, models, settings and Python envs are kept, and setup re-runs
+only when the requirements changed. A git checkout is updated with git. A downloaded release is updated by
+swapping files, and the old files stay in `.previous/` until the next update. The repository comes from
+`update-source`.
+
 ## Getting started
 
 1. Run the setup script (see Setup above) and start the app (`./run.sh` or `run.bat`).

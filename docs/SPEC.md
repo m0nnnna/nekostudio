@@ -229,6 +229,13 @@ canvas-drawn shard/hex pattern like the mockup's wallpaper (cheap, static, redra
 - `setup.ps1` (Windows 10/11): same steps with winget fallback hints for git/ffmpeg, uv via the
   official PowerShell installer, `.venv\Scripts\python.exe`, Start Menu shortcut.
 - `run.sh` / `run.ps1`: activate venv, `python -m nekostudio --open` (opens browser).
+- `nekostudio-update` / `nekostudio-update.bat` (`.ps1`) run `nekostudio/updater.py` (stdlib only,
+  `python -I`): releases via the GitHub API `releases/latest`, `--edge` via `commits/<branch>`, `--check`
+  exits 0/10/1. Git checkouts use fetch + checkout; other installs download one codeload tarball, extract
+  it to `.update-new/`, move the old top-level entries (except data, envs, vendor, .git, VERSION,
+  update-source) to `.previous/` and the new ones in, then write `VERSION` (`v0.1.0` or
+  `v0.1.0-N-g<sha>`). Setup re-runs when requirements/setup files changed. Setup links the command into
+  `~/.local/bin` (Windows: a `.cmd` shim in `%USERPROFILE%\.local\bin`, added to the user PATH).
 - `nekoenv.sh` / `nekoenv.ps1` (sourced by setup and run) pick `ENV_DIR`, the folder holding
   `.venv`, `.venv-train` and `vendor/`, and export it as `NEKOSTUDIO_ENV`. It is the install dir,
   unless that dir is on a network share (UNC path or remote drive on Windows; cifs/smb3/nfs/gvfs/sshfs

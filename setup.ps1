@@ -67,4 +67,15 @@ $sh.WorkingDirectory = $PSScriptRoot
 $sh.IconLocation = (Join-Path $PSHOME 'powershell.exe') + ',0'
 $sh.Save()
 
+Step 'nekostudio-update command'
+$bin = Join-Path $env:USERPROFILE '.local\bin'
+New-Item -ItemType Directory -Force $bin | Out-Null
+Set-Content -Path (Join-Path $bin 'nekostudio-update.cmd') -Encoding ASCII -Value "@powershell -NoProfile -ExecutionPolicy Bypass -File `"$(Join-Path $PSScriptRoot 'nekostudio-update.ps1')`" %*"
+$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+if (($userPath -split ';') -notcontains $bin) {
+    [Environment]::SetEnvironmentVariable('Path', ($userPath.TrimEnd(';') + ";$bin").TrimStart(';'), 'User')
+    Write-Host "Added $bin to your PATH (new terminals pick it up)."
+}
+Write-Host 'nekostudio-update installs the newest release, nekostudio-update --edge the newest commit.'
+
 Write-Host "`nDone. Put checkpoints in $PSScriptRoot\data\models\checkpoints and start with run.bat" -ForegroundColor Green

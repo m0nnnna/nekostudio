@@ -81,4 +81,9 @@ Terminal=true
 Categories=Graphics;
 DESK
 
+log "nekostudio-update command"
+mkdir -p "$HOME/.local/bin"
+ln -sfn "$ROOT/nekostudio-update" "$HOME/.local/bin/nekostudio-update"
+echo "nekostudio-update installs the newest release, nekostudio-update --edge the newest commit."
+
 log "Done. Put checkpoints in $ROOT/data/models/checkpoints and start with ./run.sh"

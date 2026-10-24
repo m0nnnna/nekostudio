@@ -17,7 +17,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
-from . import __version__, catalog, config, downloads
+from . import __version__, catalog, config, downloads, updater
 from .engine import image as image_engine
 from .engine import video as video_engine
 from .jobs import jobs
@@ -26,6 +26,8 @@ from .lora import train as trainer
 from .prompts import local_llm, pony, tagdb, translate as translator
 
 app = FastAPI(title="NekoStudio", version=__version__)
+# What nekostudio-update installed: 0.1.0, or 0.1.0-3-gabc1234 for an --edge build.
+INSTALLED = updater.installed().removeprefix("v")
 
 
 # ---- request models (extra keys are tolerated so the UI can evolve) -------------------------
@@ -137,7 +139,7 @@ def _has(mod: str) -> bool:
 
 @app.get("/api/status")
 def status():
-    return {"version": __version__, "gpu": _gpu(), "torch": _has("torch"), "diffusers": _has("diffusers"),
+    return {"version": INSTALLED, "gpu": _gpu(), "torch": _has("torch"), "diffusers": _has("diffusers"),
             "train_ready": config.train_ready(), "busy": jobs.busy, "queue": jobs.pending}
 
 
