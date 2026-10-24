@@ -147,6 +147,9 @@ bucket_reso_steps = 64
     ]
     if sdxl:
         args += ["--no_half_vae", "--network_train_unet_only"]
+        if config.on_network(ckpt):
+            # mmap over SMB/NFS reads the checkpoint in tiny random chunks; one sequential read is far faster.
+            args.append("--disable_mmap_load_safetensors")
     # No --clip_skip: kohya ignores it for SDXL (and only trains the UNet here anyway).
 
     env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8",

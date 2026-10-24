@@ -9,6 +9,9 @@ from urllib.parse import quote
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+# Python envs + the kohya checkout. run/setup scripts point this at local disk when ROOT is on a network
+# share (venvs on SMB are slow and each PC needs its own); otherwise it is ROOT.
+ENV_DIR = Path(os.environ.get("NEKOSTUDIO_ENV") or ROOT).resolve()
 HOME = Path(os.environ.get("NEKOSTUDIO_HOME") or ROOT / "data").resolve()
 
 SETTINGS_FILE = HOME / "settings.json"
@@ -22,7 +25,14 @@ def _models_root() -> Path:
             d = json.loads(SETTINGS_FILE.read_text("utf-8")).get("models_dir")
         except (OSError, ValueError):
             d = None
-    return Path(d).expanduser().resolve() if d else HOME / "models"
+    if d:
+        p = Path(d).expanduser()
+        # A shared install can be started from Linux and Windows; a models_dir from the other OS
+        # (or an unplugged drive) must not turn into a stray folder here.
+        if p.is_absolute() and p.is_dir():
+            return p.resolve()
+        print(f"[nekostudio] models_dir {d!r} not found on this PC, using {HOME / 'models'}", flush=True)
+    return HOME / "models"
 
 
 MODELS = _models_root()
@@ -38,7 +48,7 @@ DATASETS = HOME / "datasets"
 TRAINING = HOME / "training"
 HF_HOME = MODELS / "hf" if MODELS != HOME / "models" else HOME / "hf"
 WEB_DIR = ROOT / "web"
-VENDOR = ROOT / "vendor"
+VENDOR = ENV_DIR / "vendor"
 
 HOME.mkdir(parents=True, exist_ok=True)
 for _d in (CHECKPOINTS, LORAS, VAES, TAGS, LLMS, IMAGES, VIDEOS, DATASETS, TRAINING, HF_HOME):
@@ -48,6 +58,8 @@ for _d in (CHECKPOINTS, LORAS, VAES, TAGS, LLMS, IMAGES, VIDEOS, DATASETS, TRAIN
 os.environ.setdefault("HF_HOME", str(HF_HOME))
 # Plain single-stream HTTP for HF downloads (xet fetches many chunks in parallel and keeps a chunk cache).
 os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+# Shares often can't do symlinks; huggingface_hub then copies into the cache by itself, no need to warn.
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 
 DEFAULT_NEGATIVE = (
     "score_6, score_5, score_4, worst quality, low quality, bad anatomy, bad hands, "
@@ -142,8 +154,34 @@ def file_url(path: Path) -> str:
 
 def train_python() -> Path:
     sub = "Scripts/python.exe" if os.name == "nt" else "bin/python"
-    return ROOT / ".venv-train" / sub
+    return ENV_DIR / ".venv-train" / sub
 
 
 def train_ready() -> bool:
     return train_python().exists() and (VENDOR / "sd-scripts" / "train_network.py").exists()
+
+
+_NET_FS = {"cifs", "smb3", "smbfs", "nfs", "nfs4", "9p", "fuse.gvfsd-fuse", "fuse.sshfs", "afpfs"}
+
+
+def on_network(path: Path) -> bool:
+    """True when `path` lives on a network share (UNC path, mapped drive, or a CIFS/NFS/gvfs mount)."""
+    path = Path(path)
+    if os.name == "nt":
+        s = str(path)
+        if s.startswith("\\\\"):
+            return True
+        import ctypes
+        return ctypes.windll.kernel32.GetDriveTypeW(path.drive + "\\") == 4  # DRIVE_REMOTE
+    try:
+        best, fstype = "", ""
+        target = str(path.resolve())
+        with open("/proc/self/mounts", encoding="utf-8") as f:
+            for line in f:
+                parts = line.split()
+                mnt = parts[1].replace("\\040", " ")
+                if (target == mnt or target.startswith(mnt.rstrip("/") + "/")) and len(mnt) >= len(best):
+                    best, fstype = mnt, parts[2]
+        return fstype in _NET_FS
+    except OSError:
+        return False

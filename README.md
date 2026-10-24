@@ -21,6 +21,23 @@ Setup creates `.venv` (Python 3.12, torch CUDA 12.8) via `uv`, and for training 
 `.venv-train` with kohya sd-scripts in `vendor/`. Re-running setup updates everything. The server
 itself starts without a GPU or models; `/api/status` shows what is missing.
 
+### Running from a network share
+
+NekoStudio can live on a Windows share (`\\server\share\nekostudio` or a mapped drive like `Z:`), and
+Linux can run it from an SMB/NFS mount too. Run setup once on each PC that uses it. When the scripts see a
+network path they keep the Python envs and the trainer on that PC's local disk
+(`%LOCALAPPDATA%\NekoStudio\env-<id>` or `~/.local/share/nekostudio/env-<id>`), because loading
+torch's DLLs over SMB is slow and every PC needs its own. Settings, models, datasets, LoRAs and outputs
+stay on the share, so all PCs see the same studio.
+
+- Start it with `run.bat` or the Start Menu shortcut. cmd.exe prints "UNC paths are not supported"
+  when started in a `\\server` folder; that warning is harmless.
+- If Windows asks "Do you want to run this file?" for files on the share, add the server to Local
+  intranet (Internet Options > Security) or open it through a mapped drive.
+- Keep the share path short, or turn on Windows long paths, because Hugging Face cache paths get long.
+- If `models_dir` in `data/settings.json` points somewhere that doesn't exist on this PC (another OS's
+  path, an unplugged drive), NekoStudio uses `data/models` instead and says so in the console.
+
 ## Getting started
 
 1. Run the setup script (see Setup above) and start the app (`./run.sh` or `run.bat`).
@@ -35,7 +52,8 @@ model, a VAE and the auto-taggers). Downloads resume after a cancel or a crash. 
 `.safetensors` by dropping files or pasting a Hugging Face / Civitai link (Civitai usually needs an API token,
 set it in SETTINGS). Pickle files (`.ckpt`, `.pt`) are refused.
 
-Data lives in `./data` (override with env `NEKOSTUDIO_HOME`).
+Data lives in `./data` (override with env `NEKOSTUDIO_HOME`). Models can sit on another drive: set
+`"models_dir"` in `data/settings.json` or env `NEKOSTUDIO_MODELS`.
 
 - Checkpoints (`.safetensors`): `data/models/checkpoints/`
 - LoRAs: `data/models/loras/` (trained LoRAs land here)

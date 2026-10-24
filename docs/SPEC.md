@@ -229,3 +229,13 @@ canvas-drawn shard/hex pattern like the mockup's wallpaper (cheap, static, redra
 - `setup.ps1` (Windows 10/11): same steps with winget fallback hints for git/ffmpeg, uv via the
   official PowerShell installer, `.venv\Scripts\python.exe`, Start Menu shortcut.
 - `run.sh` / `run.ps1`: activate venv, `python -m nekostudio --open` (opens browser).
+- `nekoenv.sh` / `nekoenv.ps1` (sourced by setup and run) pick `ENV_DIR`, the folder holding
+  `.venv`, `.venv-train` and `vendor/`, and export it as `NEKOSTUDIO_ENV`. It is the install dir,
+  unless that dir is on a network share (UNC path or remote drive on Windows; cifs/smb3/nfs/gvfs/sshfs
+  on Linux). Then it is `%LOCALAPPDATA%\NekoStudio\env-<sha1(path)[:8]>` or
+  `~/.local/share/nekostudio/env-<id>`, and `PYTHONPYCACHEPREFIX` points there too.
+  `config.ENV_DIR` / `config.VENDOR` / `config.train_python()` follow `NEKOSTUDIO_ENV`.
+- Network-share rules: the Windows shortcut runs powershell.exe directly, because cmd.exe can't use a UNC
+  working directory. Kohya gets `--disable_mmap_load_safetensors` when the SDXL checkpoint is on a share
+  (`config.on_network`). Dataset hardlinks fall back to copies. A `models_dir` that doesn't exist on this
+  PC falls back to `data/models`.
