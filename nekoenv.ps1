@@ -15,3 +15,6 @@ if ($net) {
     $env:PYTHONPYCACHEPREFIX = Join-Path $EnvDir 'pycache'
 }
 $env:NEKOSTUDIO_ENV = $EnvDir
+# uv's download cache defaults to C:\Users\<you>\AppData\Local\uv\cache; torch alone needs several GB there.
+# Keep it next to the envs instead (same drive, so uv can hardlink from it), unless you set your own.
+if (-not $env:UV_CACHE_DIR) { $env:UV_CACHE_DIR = Join-Path $EnvDir '.uv-cache' }

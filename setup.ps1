@@ -32,6 +32,14 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
 Need uv 'astral-sh.uv'
 
 if ($EnvDir -ne $Root) { Step "Install is on a network share: Python envs go to $EnvDir (data and models stay here)" }
+# torch + CUDA is ~5 GB per env plus the same again in uv's cache while it unpacks.
+$need = if ($NoTrain) { 12 } else { 22 }
+$drive = [IO.Path]::GetPathRoot((Resolve-Path $EnvDir).ProviderPath)
+try { $free = [math]::Floor((New-Object IO.DriveInfo($drive)).AvailableFreeSpace / 1GB) } catch { $free = -1 }
+Write-Host "Python envs and uv cache: $EnvDir ($free GB free on $drive)"
+if ($free -ge 0 -and $free -lt $need) {
+    throw "Only $free GB free on $drive; setup needs about $need GB there (use -NoTrain for about 12 GB). Free some space and re-run."
+}
 Step 'Main environment (.venv, Python 3.12)'
 $Py = Join-Path $EnvDir '.venv\Scripts\python.exe'
 $TrainPy = Join-Path $EnvDir '.venv-train\Scripts\python.exe'

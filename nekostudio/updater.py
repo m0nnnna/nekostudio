@@ -24,7 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_REPO = "m0nnnna/nekostudio"
 # Never moved or replaced: user data, envs, the trainer checkout, git metadata, the updater's own dirs.
-KEEP = {"data", ".venv", ".venv-train", "vendor", ".git", ".previous", ".update-new", "VERSION", "update-source"}
+KEEP = {"data", ".venv", ".venv-train", ".uv-cache", "vendor", ".git", ".previous", ".update-new", "VERSION", "update-source"}
 SETUP_INPUTS = ("requirements.txt", "requirements-train.txt", "setup.sh", "setup.ps1", "nekoenv.sh", "nekoenv.ps1")
 WIN = os.name == "nt"
 
