@@ -10,6 +10,7 @@ from .. import config
 from ..engine import image as image_engine
 from ..engine import video as video_engine
 from ..jobs import Job
+from ..prompts import local_llm
 from . import dataset as ds
 
 PRESETS = {
@@ -76,6 +77,30 @@ def _prepare_dataset(name: str, trigger: str, dest, prune_core: bool = False):
     return count, sorted(core)
 
 
+# Native crashes: Windows access violation (0xC0000005, as unsigned or signed exit code), Linux SIGSEGV/SIGKILL.
+CRASH_CODES = {3221225477, -1073741819, -11, 139, -9, 137}
+
+
+def _ram_gb() -> tuple[float, float]:
+    """(available RAM, available RAM + page file) in GB, or (-1, -1) if unknown."""
+    try:
+        if os.name == "nt":
+            import ctypes
+
+            class MS(ctypes.Structure):
+                _fields_ = [("len", ctypes.c_ulong), ("load", ctypes.c_ulong)] + \
+                    [(n, ctypes.c_ulonglong) for n in ("tot", "avail", "tot_pf", "avail_pf", "tot_v", "avail_v", "ext")]
+            m = MS()
+            m.len = ctypes.sizeof(MS)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
+            return m.avail / 2**30, m.avail_pf / 2**30
+        info = dict(l.split(":", 1) for l in open("/proc/meminfo", encoding="utf-8"))
+        kb = lambda k: int(info[k].split()[0]) / 2**20  # noqa: E731
+        return kb("MemAvailable"), kb("MemAvailable") + kb("SwapFree")
+    except Exception:  # noqa: BLE001
+        return -1, -1
+
+
 def run(job: Job, p: dict):
     if not config.train_ready():
         raise RuntimeError("LoRA trainer is not installed. " + SETUP_HINT)
@@ -94,7 +119,8 @@ def run(job: Job, p: dict):
     sdxl = kind != "sd15"
     res = int(preset.get("resolution") or (1024 if sdxl else 512))
 
-    # Training needs the whole GPU.
+    # Training needs the whole GPU, and loading SDXL in the trainer needs a lot of RAM: drop everything we hold.
+    local_llm.unload()
     image_engine.unload()
     video_engine.unload()
 
@@ -156,6 +182,7 @@ bucket_reso_steps = 64
                PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True")
     job.update(progress=0, message=f"starting trainer ({n_images} images, {preset['epochs']} epochs)...")
     (work / "command.txt").write_text(" ".join(args), "utf-8")
+    ram, commit = _ram_gb()
     proc = subprocess.Popen(args, cwd=str(config.VENDOR / "sd-scripts"), env=env, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT)
     job.proc = proc
@@ -211,6 +238,13 @@ bucket_reso_steps = 64
         if any("OutOfMemoryError" in l for l in tail):
             raise RuntimeError("Out of GPU memory while training. Close games or other GPU apps and try again, "
                                "or lower the resolution under ADVANCED.")
+        if code in CRASH_CODES:
+            mem = f" When it started, this PC had {ram:.0f} GB RAM free ({commit:.0f} GB with the page file)." if ram >= 0 else ""
+            raise RuntimeError(
+                "The trainer crashed, which almost always means it ran out of system RAM "
+                f"(SDXL training needs about 16 GB free, plus a page file).{mem} Close browsers and games and try "
+                "again. On Windows, let Windows manage the page file size (System > About > Advanced system "
+                f"settings > Performance > Advanced > Virtual memory). Log: {work / 'train.log'}")
         raise RuntimeError("Trainer exited with code %s: %s" % (code, " | ".join(tail[-4:])))
     result = out_dir / f"{name}.safetensors"
     if not result.exists():
