@@ -64,7 +64,18 @@ def list_checkpoints() -> list[dict]:
 
 
 def list_loras() -> list[dict]:
-    return [{"name": p.relative_to(config.LORAS).as_posix(), "path": str(p)} for p in _scan(config.LORAS)]
+    out = []
+    for p in _scan(config.LORAS):
+        item = {"name": p.relative_to(config.LORAS).as_posix(), "path": str(p), "trigger": "", "base": ""}
+        side = p.with_suffix(".json")  # written by our trainer
+        if side.is_file():
+            try:
+                d = json.loads(side.read_text("utf-8"))
+                item.update(trigger=str(d.get("trigger") or ""), base=str(d.get("base") or ""))
+            except (OSError, ValueError):
+                pass
+        out.append(item)
+    return out
 
 
 def list_vaes() -> list[dict]:

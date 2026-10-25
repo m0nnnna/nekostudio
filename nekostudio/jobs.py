@@ -28,6 +28,7 @@ class Job:
         self.total = 0
         self.message = ""
         self.results: list[dict] = []
+        self.info: dict = {}  # extra fields for the UI (e.g. which LoRA a training job makes)
         self.error: str | None = None
         self.cancel_event = threading.Event()
         self.proc = None  # subprocess.Popen for training, killed on cancel
@@ -38,6 +39,8 @@ class Job:
              "step": self.step, "total": self.total, "message": self.message, "results": list(self.results)}
         if self.error:
             d["error"] = self.error
+        if self.info:
+            d["info"] = self.info
         return d
 
     def update(self, progress=None, step=None, total=None, message=None):
@@ -103,6 +106,9 @@ class JobManager:
 
     def get(self, job_id: str) -> Job | None:
         return self._jobs.get(job_id)
+
+    def active(self) -> list[Job]:
+        return [j for j in list(self._jobs.values()) if j.state in ("queued", "running")]
 
     @property
     def busy(self) -> bool:

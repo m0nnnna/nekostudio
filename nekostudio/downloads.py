@@ -380,3 +380,4 @@ def delete_lora(name: str):
     if base not in p.parents or p.suffix.lower() not in (".safetensors", ".ckpt") or not p.is_file():
         raise FileNotFoundError(name)
     p.unlink()
+    p.with_suffix(".json").unlink(missing_ok=True)

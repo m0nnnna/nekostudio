@@ -291,5 +291,5 @@ dialog form { display: grid; gap: 12px; }
 .qthumbs div { position: relative; border: 1px solid var(--line); background: var(--panel-2); }
 .qthumbs img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
 .qthumbs .x { position: absolute; top: 2px; right: 2px; background: var(--panel); border: 1px solid var(--line-strong); cursor: pointer; font: 11px var(--mono); padding: 0 5px; color: var(--fg); }
-.lirow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 6px; border-bottom: 1px solid var(--line); font: 12px var(--mono); }
+.lirow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 8px 6px; border-bottom: 1px solid var(--line); font: 12px var(--mono); }
 .lirow span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

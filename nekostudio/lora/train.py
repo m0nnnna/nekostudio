@@ -1,6 +1,7 @@
 """Builds a kohya sd-scripts run and launches it inside the separate training venv."""
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -254,6 +255,8 @@ bucket_reso_steps = 64
             raise RuntimeError("Training finished but produced no .safetensors file.")
         result = found[-1]
     shutil.copy2(result, config.LORAS / f"{name}.safetensors")
+    # sidecar read by the LoRA list, so USE can add the trigger word and pick the base model later
+    (config.LORAS / f"{name}.json").write_text(json.dumps({"trigger": trigger, "base": ckpt_name}), "utf-8")
     job.add_result("", meta={"kind": "lora", "name": f"{name}.safetensors", "trigger": trigger})
     job.update(progress=1, message=f"done: {name}.safetensors")
 

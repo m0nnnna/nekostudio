@@ -227,6 +227,12 @@ def generate_video(req: VideoReq):
     return {"job_id": jobs.submit("video", lambda job: video_engine.run(job, p)).id}
 
 
+@app.get("/api/jobs")
+def list_jobs():
+    """Queued and running jobs, so a reloaded page can pick them up again."""
+    return [j.to_dict() for j in jobs.active()]
+
+
 @app.get("/api/jobs/{job_id}")
 def get_job(job_id: str):
     job = jobs.get(job_id)
@@ -373,7 +379,9 @@ def datasets_autocaption(name: str, req: AutocaptionReq):
 def train(req: TrainReq):
     _ds_call(ds._dir, req.dataset)
     p = req.model_dump()
-    return {"job_id": jobs.submit("train", lambda job: trainer.run(job, p)).id}
+    job = jobs.submit("train", lambda job: trainer.run(job, p))
+    job.info = {"flow": "wizard", "name": p.get("name") or ""}
+    return {"job_id": job.id}
 
 
 class QuickReq(_Base):
@@ -398,7 +406,9 @@ def lora_quick(req: QuickReq):
         ckpt = pick["name"] if pick else ""
     if not ckpt or not (config.CHECKPOINTS / ckpt).is_file():
         raise HTTPException(400, "Pick a base checkpoint (download one in MODELS).")
-    return {"job_id": jobs.submit("train", lambda job: trainer.run_quick(job, req.name, req.type, ckpt)).id}
+    job = jobs.submit("train", lambda job: trainer.run_quick(job, req.name, req.type, ckpt))
+    job.info = {"flow": "quick", "name": req.name, "base": ckpt}
+    return {"job_id": job.id}
 
 
 # ---- static ---------------------------------------------------------------------------------

@@ -764,6 +764,8 @@ function initModels() {
   document.addEventListener("click", async ev => {
     const t = ev.target;
     const st = t.closest?.("[data-dl-start]"), ca = t.closest?.("[data-dl-cancel]"), gm = t.closest?.("[data-go-models]"), de = t.closest?.("[data-lora-del]");
+    const us = t.closest?.("[data-lora-use]");
+    if (us) return useLora(us.dataset.loraUse);
     if (st) startDl(st.dataset.dlStart);
     else if (ca) cancelDl(ca.dataset.dlCancel);
     else if (gm) go("models");
@@ -779,7 +781,7 @@ function initModels() {
 function renderLoraList() {
   const list = S.models.loras;
   $("#li-count").textContent = list.length + " installed";
-  $("#li-list").innerHTML = list.length ? list.map(l => `<div class="lirow"><span title="${esc(l.name)}">${esc(l.name)}</span><button class="btn sm" data-lora-del="${esc(l.name)}" type="button">DELETE</button></div>`).join("")
+  $("#li-list").innerHTML = list.length ? list.map(l => `<div class="lirow"><span title="${esc(l.name)}">${esc(l.name)}</span><button class="btn sm pri" data-lora-use="${esc(l.name)}" type="button">USE</button><button class="btn sm" data-lora-del="${esc(l.name)}" type="button">DELETE</button></div>`).join("")
     : '<div class="note" style="padding:10px 6px">No LoRAs yet. Train one above or import one.</div>';
 }
 
@@ -1005,7 +1007,7 @@ async function startTraining() {
   try {
     const { job_id } = await api("/train", { method: "POST", json: body });
     L.loss = []; L.lastMsg = "";
-    $("#l-samples").innerHTML = ""; $("#l-done").textContent = ""; drawSpark();
+    $("#l-samples").innerHTML = ""; $("#l-done").hidden = true; drawSpark();
     $("#l-stop").dataset.busy = "1"; $("#l-stop").disabled = false; updateTrainGate();
     track(job_id, {
       p: "t", update: trainUpdate,
@@ -1013,13 +1015,21 @@ async function startTraining() {
         trainUpdate(job);
         $("#l-stop").dataset.busy = ""; $("#l-stop").disabled = true; updateTrainGate();
         if (job.state === "done") {
-          $("#l-done").textContent = `LoRA "${body.name}" is ready and listed in CREATE.`;
-          toast("Training", "LoRA finished");
-          await refreshModels();
+          await trainDone(job, body.name);
         }
       }
     });
   } catch (e) { fail("Train", e); }
+}
+async function trainDone(job, name) {
+  toast("Training", "LoRA finished");
+  await refreshModels();
+  const res = (job.results || []).find(r => r.meta?.kind === "lora");
+  L.result = { file: res?.meta.name || name + ".safetensors", trigger: res?.meta.trigger || "", base: "" };
+  const l = S.models.loras.find(x => x.name === L.result.file);
+  if (l) { L.result.trigger ||= l.trigger; L.result.base = l.base; }
+  $("#l-donetxt").textContent = `LoRA "${name}" is ready.`;
+  $("#l-done").hidden = false;
 }
 function trainUpdate(job) {
   // message looks like "epoch 3/10 loss 0.123"
@@ -1051,7 +1061,8 @@ function initQuick() {
   dropFiles["q-files"] = qUpload;
   $("#q-train").onclick = startQuick;
   $("#q-stop").onclick = cancelActive;
-  $("#q-try").onclick = tryLora;
+  $("#q-try").onclick = () => tryLora(Q.result);
+  $("#l-try").onclick = () => tryLora(L.result);
   $("#l-more").onclick = () => {
     const wz = $("#l-wizard");
     wz.hidden = !wz.hidden;
@@ -1119,26 +1130,63 @@ async function startQuick() {
       },
       end: async job => {
         $("#q-stop").dataset.busy = ""; $("#q-stop").disabled = true; updateQuickGate();
-        if (job.state !== "done") return;
-        await refreshModels();
-        const res = (job.results || []).find(r => r.meta?.kind === "lora");
-        Q.result = { file: res?.meta.name || name + ".safetensors", trigger: res?.meta.trigger || name, base: v("q-base") };
-        $("#q-donetxt").textContent = `"${name}" is ready.`;
-        $("#q-done").hidden = false;
-        toast("LoRA ready", `${name} finished training`);
+        if (job.state === "done") await quickDone(job, name, v("q-base"));
       }
     });
   } catch (e) { fail("Train", e); }
 }
+async function quickDone(job, name, base) {
+  await refreshModels();
+  const res = (job.results || []).find(r => r.meta?.kind === "lora");
+  Q.result = { file: res?.meta.name || name + ".safetensors", trigger: res?.meta.trigger || name, base };
+  $("#q-donetxt").textContent = `"${name}" is ready.`;
+  $("#q-done").hidden = false;
+  toast("LoRA ready", `${name} finished training`);
+}
+// pick up a training job that was started before this page was (re)loaded
+async function resumeTraining() {
+  let active;
+  try { active = await api("/jobs"); } catch { return; }
+  const job = (active || []).find(j => j.kind === "train" && j.info?.flow);
+  if (!job) return;
+  const { flow, name, base } = job.info;
+  if (flow === "quick") {
+    if (name && !v("q-name")) { setv("q-name", name); $("#q-trig").textContent = name; }
+    $("#q-stop").dataset.busy = "1"; $("#q-stop").disabled = false; updateQuickGate();
+    track(job.id, {
+      p: "q",
+      update: j => { if (j.state !== "error") $("#q-pct").textContent = `${j.state.toUpperCase()} ${Math.round((j.progress || 0) * 100)}%${j.message ? " | " + j.message : ""}`; },
+      end: async j => {
+        $("#q-stop").dataset.busy = ""; $("#q-stop").disabled = true; updateQuickGate();
+        if (j.state === "done") await quickDone(j, name, base || "");
+      }
+    });
+  } else {
+    L.loss = []; L.lastMsg = "";
+    $("#l-stop").dataset.busy = "1"; $("#l-stop").disabled = false; updateTrainGate();
+    track(job.id, {
+      p: "t", update: trainUpdate,
+      end: async j => {
+        trainUpdate(j);
+        $("#l-stop").dataset.busy = ""; $("#l-stop").disabled = true; updateTrainGate();
+        if (j.state === "done") await trainDone(j, name);
+      }
+    });
+  }
+}
+// USE in the LoRA list: same as TRY IT, with what the sidecar remembers
+function useLora(file) {
+  const l = S.models.loras.find(x => x.name === file);
+  tryLora({ file, trigger: l?.trigger || "", base: l?.base || "" });
+}
 // jump to CREATE with the new LoRA at 0.8 and its trigger word in the prompt
-function tryLora() {
-  const r = Q.result;
+function tryLora(r) {
   if (!r) return;
   go("create");
   if (r.base && S.models.checkpoints.some(c => c.name === r.base)) { setv("c-ckpt", r.base); onCkptChange(true); }
   if (!getLoras().some(l => l.name === r.file)) addLoraRow(r.file, 0.8);
   const p = v("c-prompt");
-  if (!p.toLowerCase().includes(r.trigger.toLowerCase())) setv("c-prompt", r.trigger + (p.trim() ? ", " + p : ""));
+  if (r.trigger && !p.toLowerCase().includes(r.trigger.toLowerCase())) setv("c-prompt", r.trigger + (p.trim() ? ", " + p : ""));
   updateGenerate();
 }
 
@@ -1368,5 +1416,6 @@ async function start() {
   setInterval(pollStatus, 5000);
   await Promise.all([refreshModels(), loadSettings(), loadCatalog()]);
   fillSettingsForm();
+  resumeTraining();
 }
 start();
