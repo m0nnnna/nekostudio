@@ -72,12 +72,17 @@ Data lives in `./data` (override with env `NEKOSTUDIO_HOME`). Models can sit on 
 - LoRAs: `data/models/loras/` (trained LoRAs land here)
 - VAEs: `data/models/vae/`
 
-Video models are Hugging Face repos listed in settings, downloaded on first use to `data/hf/`.
+Video models are Hugging Face repos listed in settings. MODELS downloads them file by file into
+`data/models/repos/<owner>--<name>/` (older installs in `data/hf/` keep working).
 Filenames containing "pony" turn on Pony mode (score tags, clip skip 2).
 
 ## Features
 
 - CREATE: txt2img / img2img, LoRA stack with weights, samplers, seed, batch, clip skip, VAE.
+- OUTFITS: drop a character (a reference sheet works) and an outfit picture (on a faceless model or on its own);
+  NekoStudio tags both, keeps the character's hair/eyes/ears/tail and the outfit's clothing, and generates with
+  two IP-Adapters. Drag a box around the face for better likeness. Needs an SDXL-family checkpoint and the
+  IP-Adapter from MODELS (4.2 GB).
 - MOTION: Wan 2.1 text-to-video and image-to-video.
 - MODELS: one-click model downloads and `.safetensors` import. LORA: one screen (name, type, pictures, TRAIN), LoRA import and delete.
 - TRANSLATE: prose to Pony tags. GALLERY and SETTINGS (skins, accents, remote LLM endpoint, translator GPU layers).

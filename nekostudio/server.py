@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from . import __version__, catalog, config, downloads, updater
 from .engine import image as image_engine
+from .engine import outfit as outfit_engine
 from .engine import video as video_engine
 from .jobs import jobs
 from .lora import dataset as ds
@@ -58,6 +59,28 @@ class ImageReq(_Base):
     pony: Optional[bool] = None
     init_image: Optional[str] = None
     strength: Optional[float] = None
+
+
+class OutfitReq(_Base):
+    character: str                      # data URL of the character / reference sheet
+    outfit: str                         # data URL of the outfit (on a faceless model or on its own)
+    face_box: Optional[list[float]] = None   # x0, y0, x1, y1 as fractions of the character picture
+    prompt: str = ""
+    negative: str = ""
+    checkpoint: str = ""
+    vae: Optional[str] = None
+    loras: list[LoraRef] = Field(default_factory=list)
+    width: int = 832
+    height: int = 1216
+    steps: int = 28
+    cfg: float = 6.0
+    sampler: str = "euler_a"
+    seed: int = -1
+    batch: int = 1
+    clip_skip: Optional[int] = None
+    pony: Optional[bool] = None
+    character_strength: float = 0.5
+    outfit_strength: float = 0.6
 
 
 class VideoReq(_Base):
@@ -148,7 +171,7 @@ def models():
     video = [dict(m, installed=catalog.video_installed(m["id"]), in_catalog=any(e["repo"] == m["id"] for e in catalog.CATALOG))
              for m in video_engine.list_models()]
     return {"checkpoints": image_engine.list_checkpoints(), "loras": image_engine.list_loras(),
-            "vaes": image_engine.list_vaes(), "video": video}
+            "vaes": image_engine.list_vaes(), "video": video, "ip_adapter": catalog.ip_adapter_dir() is not None}
 
 
 @app.delete("/api/models/lora/{name:path}")
@@ -219,6 +242,14 @@ def put_settings(body: dict):
 def generate_image(req: ImageReq):
     p = req.model_dump()
     return {"job_id": jobs.submit("image", lambda job: image_engine.run(job, p)).id}
+
+
+@app.post("/api/generate/outfit")
+def generate_outfit(req: OutfitReq):
+    p = req.model_dump()
+    if p["face_box"] is not None and len(p["face_box"]) != 4:
+        raise HTTPException(400, "face_box needs 4 numbers: x0, y0, x1, y1.")
+    return {"job_id": jobs.submit("outfit", lambda job: outfit_engine.run(job, p)).id}
 
 
 @app.post("/api/generate/video")

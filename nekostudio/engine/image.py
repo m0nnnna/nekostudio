@@ -21,7 +21,9 @@ from ..jobs import Job
 PONY_POS = "score_9, score_8_up, score_7_up, "
 PONY_NEG = "score_6, score_5, score_4, "
 
-_state: dict = {"key": None, "pipe": None, "kind": None, "sched": None, "loras": (), "offload": False}
+_state: dict = {"key": None, "pipe": None, "kind": None, "sched": None, "loras": (), "offload": False, "ip": False}
+# OUTFITS: face adapter for the character, plus adapter for the outfit (same order as the images passed in)
+IP_WEIGHTS = ["ip-adapter-plus-face_sdxl_vit-h.safetensors", "ip-adapter-plus_sdxl_vit-h.safetensors"]
 _lock = threading.Lock()
 _kind_cache: dict = {}
 
@@ -87,7 +89,7 @@ def list_vaes() -> list[dict]:
 def unload():
     """Drop the cached pipeline and free VRAM (called before training)."""
     with _lock:
-        _state.update(key=None, pipe=None, kind=None, sched=None, loras=())
+        _state.update(key=None, pipe=None, kind=None, sched=None, loras=(), ip=False)
     gc.collect()
     torch = sys.modules.get("torch")
     if torch is not None and torch.cuda.is_available():
@@ -158,8 +160,29 @@ def _load_pipe(job: Job, ckpt: str, vae: str | None):
         pipe.vae.config.force_upcast = False  # the fp16-fix VAE decodes fine in half precision
     pipe.set_progress_bar_config(disable=True)
     with _lock:
-        _state.update(key=key, pipe=pipe, kind=kind, sched=dict(pipe.scheduler.config), loras=())
+        _state.update(key=key, pipe=pipe, kind=kind, sched=dict(pipe.scheduler.config), loras=(), ip=False)
     return pipe
+
+
+def set_ip_adapters(job: Job, pipe, on: bool):
+    """Attach the two OUTFITS IP-Adapters to the cached pipe, or take them off again for plain generation."""
+    if _state["ip"] == on:
+        return
+    if on:
+        from .. import catalog
+        root = catalog.ip_adapter_dir()
+        if root is None:
+            raise RuntimeError("OUTFITS needs the IP-Adapter: download it in MODELS.")
+        job.update(message="loading IP-Adapter...")
+        pipe.load_ip_adapter(str(root), subfolder="sdxl_models", weight_name=IP_WEIGHTS,
+                             image_encoder_folder="models/image_encoder")
+    else:
+        try:
+            pipe.unload_ip_adapter()
+        except Exception:  # noqa: BLE001 - a half-unloaded pipe is not worth keeping
+            unload()
+            raise RuntimeError("Could not take the IP-Adapter off the model; it was unloaded, try again.")
+    _state["ip"] = on
 
 
 def _auto_vae(ckpt: str) -> str | None:
@@ -245,6 +268,7 @@ def run(job: Job, p: dict):
 
     pipe = _load_pipe(job, ckpt, p.get("vae") or _auto_vae(ckpt))
     job.check()
+    set_ip_adapters(job, pipe, False)
     _set_sampler(pipe, p.get("sampler") or "euler_a")
     _apply_loras(pipe, p.get("loras") or [])
 

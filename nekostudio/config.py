@@ -41,6 +41,8 @@ LORAS = MODELS / "loras"
 VAES = MODELS / "vae"
 TAGS = MODELS / "tags"
 LLMS = MODELS / "llm"
+# Multi-file models (video, IP-Adapter) as plain folders, one per HF repo: repos/<owner>--<name>/
+REPOS = MODELS / "repos"
 OUTPUTS = HOME / "outputs"
 IMAGES = OUTPUTS / "images"
 VIDEOS = OUTPUTS / "videos"
@@ -51,7 +53,7 @@ WEB_DIR = ROOT / "web"
 VENDOR = ENV_DIR / "vendor"
 
 HOME.mkdir(parents=True, exist_ok=True)
-for _d in (CHECKPOINTS, LORAS, VAES, TAGS, LLMS, IMAGES, VIDEOS, DATASETS, TRAINING, HF_HOME):
+for _d in (CHECKPOINTS, LORAS, VAES, TAGS, LLMS, REPOS, IMAGES, VIDEOS, DATASETS, TRAINING, HF_HOME):
     _d.mkdir(parents=True, exist_ok=True)
 
 # Model downloads (diffusers, WD14 tagger...) stay inside the data dir unless the user set their own.

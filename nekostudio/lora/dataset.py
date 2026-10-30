@@ -113,7 +113,7 @@ def delete_item(name: str, file: str):
 
 # ---- WD14 tagger -----------------------------------------------------------------------------
 
-def _load_tagger(job: Job):
+def _load_tagger(job: Job, cpu: bool = False):
     import onnxruntime as ort
     from huggingface_hub import hf_hub_download
 
@@ -129,7 +129,7 @@ def _load_tagger(job: Job):
     else:
         raise RuntimeError(f"Could not download a WD14 tagger: {last}")
     avail = ort.get_available_providers()
-    providers = [p for p in ("CUDAExecutionProvider", "CPUExecutionProvider") if p in avail]
+    providers = [p for p in ("CUDAExecutionProvider", "CPUExecutionProvider") if p in avail and not (cpu and p.startswith("CUDA"))]
     sess = ort.InferenceSession(model, providers=providers)
     import csv
     with open(tags_csv, newline="", encoding="utf-8") as f:
@@ -152,6 +152,21 @@ def _prep(img, size: int):
     return np.ascontiguousarray(arr[None])
 
 
+def tag_image(sess, rows, img, threshold: float = 0.35) -> list[tuple[str, float]]:
+    """WD14 tags of one PIL image as (tag, confidence), best first; underscores become spaces."""
+    inp = sess.get_inputs()[0]
+    probs = sess.run(None, {inp.name: _prep(img, inp.shape[1])})[0][0]
+    scored = []
+    for r, pr in zip(rows, probs):
+        cat = int(r["category"])
+        # category 0 = general, 4 = character; character tags need a higher bar
+        if (cat == 0 and pr >= threshold) or (cat == 4 and pr >= 0.85):
+            tag = r["name"]
+            scored.append((tag.replace("_", " ") if len(tag) > 3 else tag, float(pr)))
+    scored.sort(key=lambda t: -t[1])
+    return scored
+
+
 def autocaption(job: Job, name: str, trigger: str = "", threshold: float = 0.35, overwrite: bool = False):
     from PIL import Image
     d = _dir(name)
@@ -163,20 +178,9 @@ def autocaption(job: Job, name: str, trigger: str = "", threshold: float = 0.35,
         job.update(message="nothing to caption")
         return
     sess, rows = _load_tagger(job)
-    inp = sess.get_inputs()[0]
-    size = inp.shape[1]
-    names = [r["name"] for r in rows]
-    cats = [int(r["category"]) for r in rows]
     for n, img_path in enumerate(todo, 1):
         job.check()
-        probs = sess.run(None, {inp.name: _prep(Image.open(img_path), size)})[0][0]
-        scored = []
-        for tag, cat, pr in zip(names, cats, probs):
-            # category 0 = general, 4 = character; character tags need a higher bar
-            if (cat == 0 and pr >= threshold) or (cat == 4 and pr >= 0.85):
-                scored.append((pr, tag))
-        scored.sort(reverse=True)
-        tags = [t.replace("_", " ") if len(t) > 3 else t for _, t in scored]
+        tags = [t for t, _ in tag_image(sess, rows, Image.open(img_path), threshold)]
         if trigger and trigger not in tags:
             tags.insert(0, trigger)
         _caption_path(img_path).write_text(", ".join(tags), "utf-8")

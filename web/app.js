@@ -82,17 +82,18 @@ async function urlToBlob(url) {
 /* ================= state ================= */
 const S = {
   status: null, online: false,
-  models: { checkpoints: [], loras: [], vaes: [], video: [] },
+  models: { checkpoints: [], loras: [], vaes: [], video: [], ip_adapter: false },
   settings: {},
   active: null,        // id of the job Esc will cancel
   section: "create"
 };
 
-const SECTIONS = ["create", "models", "motion", "lora", "translate", "gallery", "settings"];
+const SECTIONS = ["create", "outfits", "models", "motion", "lora", "translate", "gallery", "settings"];
 
 /* ================= icons ================= */
 const ICONS = {
   create: '<path d="M12 3l2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z"/>',
+  outfits: '<path d="M10 6a2 2 0 1 1 2 2v2"/><path d="M12 10l-9 7v2h18v-2z"/>',
   models: '<path d="M12 3v12M7 10l5 5 5-5M4 19h16"/>',
   motion: '<path d="M3 6h14v12H3z"/><path d="M17 10l4-2.5v9L17 14"/>',
   lora: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 8v8M8 10v4M16 10v4"/>',
@@ -258,6 +259,7 @@ function initSliders() {
 /* ================= image drop zones ================= */
 const drops = {};          // id -> data URL (single-image zones)
 const dropFiles = {};      // id -> callback for multi-file zones
+const dropHooks = {};      // id -> called after a single-image zone changes
 
 function setDrop(id, dataUrl) {
   const el = $(`[data-drop="${id}"]`);
@@ -267,6 +269,8 @@ function setDrop(id, dataUrl) {
     : (el.dataset.multi ? "Drop images here or click to upload" : "Drop an image or click");
   const clr = $("[data-clear]", el);
   if (clr) clr.onclick = e => { e.stopPropagation(); setDrop(id, null); };
+  dropHooks[id]?.(dataUrl);
+  updateGenerate();
 }
 function initDrops() {
   $$(".drop[data-drop]").forEach(el => {
@@ -376,10 +380,11 @@ function clock() {
 
 /* ================= models + settings load ================= */
 async function refreshModels() {
-  try { S.models = { checkpoints: [], loras: [], vaes: [], video: [], ...(await api("/models")) }; }
+  try { S.models = { checkpoints: [], loras: [], vaes: [], video: [], ip_adapter: false, ...(await api("/models")) }; }
   catch { /* keep the old lists */ }
   const m = S.models;
   fill($("#c-ckpt"), m.checkpoints, c => c.name, c => c.name);
+  fill($("#o-ckpt"), m.checkpoints.filter(c => c.kind !== "sd15"), c => c.name, c => c.name);
   fill($("#l-base"), m.checkpoints, c => c.name, c => c.name);
   fill($("#q-base"), m.checkpoints, c => c.name, c => c.name);
   if (!Q.baseTouched) { const pick = m.checkpoints.find(c => c.pony) || m.checkpoints[0]; if (pick) $("#q-base").value = pick.name; }
@@ -388,7 +393,7 @@ async function refreshModels() {
   S.ready = true;
   renderLoraList(); renderEmpties(); updateQuickGate();
   $$(".lrow select").forEach(sel => fillLoraSelect(sel));
-  onCkptChange(false);
+  onCkptChange(false); onOutfitCkpt(false);
   updateGenerate();
 }
 async function loadSettings() {
@@ -400,6 +405,7 @@ async function loadSettings() {
   if (s.motion !== undefined && store.get("ns.motion", "") === "") look.motion = !!s.motion;
   applyLook();
   if (!v("c-neg") && s.default_negative) setv("c-neg", s.default_negative);
+  if (!v("o-neg") && s.default_negative) setv("o-neg", s.default_negative);
 }
 
 /* ================= CREATE ================= */
@@ -511,6 +517,11 @@ function whyNot(kind) {
   if (kind === "image") {
     if (!v("c-ckpt")) return "No model yet. Download one in MODELS.";
     if (!v("c-prompt").trim()) return "Enter a prompt.";
+  } else if (kind === "outfit") {
+    if (!S.models.ip_adapter) return "OUTFITS needs the IP-Adapter. Download it in MODELS.";
+    if (!v("o-ckpt")) return "No SDXL-family model yet (Pony, Illustrious, SDXL ...). Download one in MODELS.";
+    if (!drops["o-char"]) return "Add a character picture.";
+    if (!drops["o-outfit"]) return "Add an outfit picture.";
   } else {
     if (!v("m-model")) return "No video model is configured.";
     const vm = S.models.video.find(x => x.id === v("m-model"));
@@ -520,9 +531,10 @@ function whyNot(kind) {
   return "";
 }
 function updateGenerate() {
-  const busyC = $("#c-cancel").dataset.busy === "1", busyM = $("#m-cancel").dataset.busy === "1";
-  const wc = whyNot("image"), wm = whyNot("video");
+  const busyC = $("#c-cancel").dataset.busy === "1", busyM = $("#m-cancel").dataset.busy === "1", busyO = $("#o-cancel").dataset.busy === "1";
+  const wc = whyNot("image"), wm = whyNot("video"), wo = whyNot("outfit");
   $("#c-go").disabled = !!wc || busyC; $("#c-why").textContent = wc;
+  $("#o-go").disabled = !!wo || busyO; $("#o-why").textContent = wo;
   $("#m-go").disabled = !!wm || busyM; $("#m-why").textContent = wm;
 }
 function setBusy(p, on) {
@@ -654,7 +666,7 @@ function modelCard(e) {
     + `<span>${esc(e.note)}</span><div class="mcs">${gbText(e.size_gb)}</div>${dlBox(e)}</div>`;
 }
 function renderModels() {
-  const groups = { "d-ckpt": e => e.kind === "checkpoint", "d-video": e => e.kind === "video", "d-extra": e => ["vae", "tagger", "tags", "llm"].includes(e.kind) };
+  const groups = { "d-ckpt": e => e.kind === "checkpoint", "d-video": e => e.kind === "video", "d-extra": e => ["vae", "ipadapter", "tagger", "tags", "llm"].includes(e.kind) };
   for (const [id, f] of Object.entries(groups)) $("#" + id).innerHTML = D.items.filter(f).map(modelCard).join("");
   const fr = $("#d-free");
   fr.textContent = D.free == null ? "" : `${D.free} GB FREE`;
@@ -706,6 +718,7 @@ function renderEmpties() {
     el.innerHTML = `<h3>${esc(title)}</h3><p>${esc(text)} <b>${esc(e.label)}</b> (${gbText(e.size_gb)}) is the one we suggest.</p>${dlBox(e)}<div class="acts"><button class="btn sm" data-go-models type="button">SEE ALL MODELS</button></div>`;
   };
   fill1($("#c-empty"), "checkpoint", !S.models.checkpoints.length, "No model yet", "You need a model before you can make pictures. One click and it downloads in the background while you look around.");
+  fill1($("#o-empty"), "ipadapter", !S.models.ip_adapter, "One download first", "OUTFITS copies a face and an outfit from your pictures with an IP-Adapter.");
   fill1($("#m-empty"), "video", !S.models.video.some(x => x.installed !== false), "No video model yet", "Motion needs a video model.");
 }
 
@@ -783,6 +796,103 @@ function renderLoraList() {
   $("#li-count").textContent = list.length + " installed";
   $("#li-list").innerHTML = list.length ? list.map(l => `<div class="lirow"><span title="${esc(l.name)}">${esc(l.name)}</span><button class="btn sm pri" data-lora-use="${esc(l.name)}" type="button">USE</button><button class="btn sm" data-lora-del="${esc(l.name)}" type="button">DELETE</button></div>`).join("")
     : '<div class="note" style="padding:10px 6px">No LoRAs yet. Train one above or import one.</div>';
+}
+
+/* ================= OUTFITS ================= */
+const ou = { items: [], sel: -1, box: null, ponyTouched: false };
+
+function onOutfitCkpt(userAction) {
+  const ck = S.models.checkpoints.find(c => c.name === v("o-ckpt"));
+  if (ck && (userAction || !ou.ponyTouched)) $("#o-pony").checked = !!ck.pony;
+}
+function initOutfits() {
+  fill($("#o-size"), ["832x1216", "896x1152", "1024x1024", "1216x832"], x => x, x => x.replace("x", " x "));
+  fill($("#o-sampler"), SAMPLERS, x => x, x => x);
+  setv("o-neg", NEG_PRESETS.pony);
+  $("#o-ckpt").onchange = () => onOutfitCkpt(true);
+  $("#o-pony").onchange = () => { ou.ponyTouched = true; };
+  $("#o-dice").onclick = () => setv("o-seed", -1);
+  $("#o-go").onclick = generateOutfit;
+  $("#o-cancel").onclick = cancelActive;
+  $("#o-save").onclick = () => ou.items[ou.sel] && download(ou.items[ou.sel].url);
+  $("#o-tocreate").onclick = () => ou.items[ou.sel] && applyParams(ou.items[ou.sel].meta);
+  $("#o-faceclr").onclick = () => setFaceBox(null);
+  $("#sec-outfits").addEventListener("input", updateGenerate);
+  dropHooks["o-char"] = url => {
+    $("#o-facefield").hidden = !url;
+    $("#o-faceimg").src = url || "";
+    setFaceBox(null);
+  };
+  // drag a rectangle on the character picture; stored as fractions of the image
+  const pick = $("#o-face");
+  let from = null;
+  const at = e => {
+    const r = $("#o-faceimg").getBoundingClientRect();
+    return [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))];
+  };
+  pick.onpointerdown = e => { from = at(e); pick.setPointerCapture(e.pointerId); };
+  pick.onpointermove = e => {
+    if (!from) return;
+    const [x, y] = at(e);
+    setFaceBox([Math.min(from[0], x), Math.min(from[1], y), Math.max(from[0], x), Math.max(from[1], y)]);
+  };
+  pick.onpointerup = () => {
+    from = null;
+    if (ou.box && (ou.box[2] - ou.box[0] < .02 || ou.box[3] - ou.box[1] < .02)) setFaceBox(null);   // a click, not a drag
+  };
+}
+function setFaceBox(box) {
+  ou.box = box;
+  const fb = $("#o-fb");
+  fb.hidden = !box;
+  if (box) Object.assign(fb.style, { left: box[0] * 100 + "%", top: box[1] * 100 + "%", width: (box[2] - box[0]) * 100 + "%", height: (box[3] - box[1]) * 100 + "%" });
+}
+async function generateOutfit() {
+  if ($("#o-go").disabled) return;
+  const [width, height] = v("o-size").split("x").map(Number);
+  const body = {
+    character: drops["o-char"], outfit: drops["o-outfit"], face_box: ou.box,
+    prompt: v("o-prompt"), negative: v("o-neg"), checkpoint: v("o-ckpt"), width, height,
+    steps: n("o-steps"), cfg: n("o-cfg"), sampler: v("o-sampler"), seed: Math.trunc(n("o-seed")), batch: n("o-batch"),
+    pony: $("#o-pony").checked, character_strength: n("o-chars"), outfit_strength: n("o-outs")
+  };
+  try {
+    const { job_id } = await api("/generate/outfit", { method: "POST", json: body });
+    ou.items = []; ou.sel = -1; renderOutfitThumbs(); $("#o-used").textContent = "";
+    setBusy("o", true);
+    track(job_id, {
+      p: "o",
+      update: job => { if (job.results?.length) setOutfitResults(job.results); },
+      end: job => { if (job.results?.length) setOutfitResults(job.results); setBusy("o", false); }
+    });
+  } catch (e) { fail("Generate", e); }
+}
+function setOutfitResults(results) {
+  const had = ou.items.length;
+  ou.items = results;
+  if (ou.sel < 0 || results.length > had) selectOutfit(results.length - 1);
+  renderOutfitThumbs();
+  const m = results[0]?.meta;
+  if (m) $("#o-used").textContent = "PROMPT USED: " + m.prompt;
+}
+function selectOutfit(i) {
+  ou.sel = i;
+  const it = ou.items[i];
+  $("#o-stage").innerHTML = it ? `<img src="${esc(it.url)}" alt="result">` : '<div class="ph">No image yet</div>';
+  ["o-save", "o-tocreate"].forEach(id => { $("#" + id).disabled = !it; });
+  renderOutfitThumbs();
+}
+function renderOutfitThumbs() {
+  const box = $("#o-thumbs");
+  box.innerHTML = "";
+  ou.items.forEach((it, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = i === ou.sel ? "sel" : "";
+    b.style.backgroundImage = `url("${it.thumb || it.url}")`;
+    b.setAttribute("aria-label", "Result " + (i + 1));
+    b.onclick = () => selectOutfit(i);
+    box.append(b);
+  });
 }
 
 /* ================= MOTION ================= */
@@ -1395,6 +1505,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
     e.preventDefault();
     if (S.section === "create") generateImage();
+    else if (S.section === "outfits") generateOutfit();
     else if (S.section === "motion") generateVideo();
     else if (S.section === "translate") runTranslate();
     else if (S.section === "lora") { if (!$("#l-wizard").hidden && L.step === 3) startTraining(); else startQuick(); }
@@ -1408,7 +1519,7 @@ document.addEventListener("keydown", e => {
 async function start() {
   applyLook();
   initRail(); initSliders(); initDrops();
-  initCreate(); initMotion(); initModels(); initLora(); initQuick(); initTranslate(); initGallery(); initSettings();
+  initCreate(); initOutfits(); initMotion(); initModels(); initLora(); initQuick(); initTranslate(); initGallery(); initSettings();
   clock(); setInterval(clock, 1000);
   go(location.hash.slice(1) || "create");
   connectEvents();

@@ -1,7 +1,8 @@
 """Model downloads and imports. They run in the jobs "dl" lane, so they never block GPU work.
 
-Single files stream to `<name>.part` and resume with HTTP Range after a cancel or a crash;
-repo snapshots (video models, taggers) go through huggingface_hub into the HF cache.
+Single files stream to `<name>.part` and resume with HTTP Range after a cancel or a crash.
+Big multi-file repos (video models, IP-Adapter) use the same streaming, one file after another, into a plain
+folder under config.REPOS. Small repo snapshots (taggers) still go through huggingface_hub into the HF cache.
 """
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ import re
 import shutil
 import time
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 import httpx
 
@@ -242,6 +243,73 @@ def _snapshot(job: Job, entry: dict):
     snapshot_download(entry["repo"], tqdm_class=Bar, max_workers=1, **kw)
 
 
+class _RepoProgress:
+    """Stands in for the job inside fetch() so a whole repo shows as one bar instead of restarting per file."""
+
+    def __init__(self, job: Job, base: int, grand: int, label: str):
+        self.job, self.base, self.grand, self.label = job, base, grand, label
+
+    def check(self):
+        self.job.check()
+
+    def update(self, progress=None, step=None, total=None, message=None):
+        if step is None:
+            self.job.update(message=f"{self.label}: {message}")
+            return
+        done = self.base + step
+        self.job.update(progress=done / self.grand if self.grand else 0, step=done, total=self.grand,
+                        message=f"{self.label} | {_progress_text(done, self.grand)}")
+
+
+def _fetch_repo(job: Job, entry: dict):
+    """Download the repo's files one by one with fetch() into catalog.repo_dir(); resumes per file."""
+    from huggingface_hub import HfApi
+    from huggingface_hub.utils import filter_repo_objects
+
+    repo = entry["repo"]
+    token = os.environ.get("HF_TOKEN") or None
+    job.update(message="listing files ...")
+    try:
+        info = HfApi().model_info(repo, files_metadata=True, token=token)
+    except Exception as e:  # noqa: BLE001 - any hub/network failure
+        raise DownloadError(f"Could not list {repo} on Hugging Face: {e}") from e
+    files = list(filter_repo_objects(info.siblings or [], allow_patterns=entry.get("only"),
+                                     ignore_patterns=entry.get("skip"), key=lambda f: f.rfilename))
+    if not files:
+        raise DownloadError(f"{repo} has no files to download.")
+    root = catalog.repo_dir(repo)
+    rev = info.sha or "main"   # pin the commit so files from two revisions never mix
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+
+    def done_already(f) -> bool:
+        p = root / f.rfilename
+        return p.is_file() and (not f.size or p.stat().st_size == f.size)
+
+    grand = sum(f.size or 0 for f in files)
+    root.mkdir(parents=True, exist_ok=True)
+    check_space(root, sum(f.size or 0 for f in files if not done_already(f)))
+    base = 0
+    for i, f in enumerate(files, 1):
+        job.check()
+        dest = root / f.rfilename
+        if not done_already(f):
+            dest.unlink(missing_ok=True)   # wrong size: a leftover from another revision
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            url = f"https://huggingface.co/{repo}/resolve/{rev}/{quote(f.rfilename)}"
+            got = fetch(_RepoProgress(job, base, grand, f"file {i}/{len(files)}"), url, dest.parent, headers=headers,
+                        name=dest.name, safetensors_only=False)
+            if got != dest:
+                os.replace(got, dest)
+            if dest.suffix == ".safetensors":
+                try:
+                    validate_safetensors(dest)
+                except DownloadError:
+                    dest.unlink(missing_ok=True)
+                    raise
+        base += f.size or dest.stat().st_size
+    (root / catalog.COMPLETE).write_text(rev, "utf-8")
+
+
 def _run_catalog(job: Job, entry: dict):
     try:
         if entry["file"]:
@@ -249,6 +317,9 @@ def _run_catalog(job: Job, entry: dict):
             # one stream, one file at a time (the "dl" lane is single-threaded); only checkpoints are safetensors
             dest = fetch(job, url, catalog.KIND_DIRS[entry["kind"]], name=entry.get("dest") or entry["file"].split("/")[-1],
                          safetensors_only=entry["kind"] in ("checkpoint", "lora", "vae"))
+        elif entry.get("local"):
+            _fetch_repo(job, entry)
+            dest = None
         else:
             _snapshot(job, entry)
             dest = None

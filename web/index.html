@@ -20,6 +20,7 @@
       <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="miter"><path d="M8 42V17L14 5l10 11 10-11 6 12v25"/><path d="M8 42h9M40 42h-9"/><path d="M20 28h2M26 28h2"/></svg>
     </div>
     <button class="rb" data-go="create"><i class="ic"></i><span>CREATE</span></button>
+    <button class="rb" data-go="outfits"><i class="ic"></i><span>OUTFITS</span></button>
     <button class="rb" data-go="models"><i class="ic"></i><span>MODELS</span></button>
     <button class="rb" data-go="motion"><i class="ic"></i><span>MOTION</span></button>
     <button class="rb" data-go="lora"><i class="ic"></i><span>LORA</span></button>
@@ -91,6 +92,52 @@
     </div></div>
   </section>
 
+  <!-- ================= OUTFITS ================= -->
+  <section class="win" id="sec-outfits" hidden>
+    <header class="wh"><span class="wt">OUTFITS</span><span class="wsub">Your character, a new outfit</span><span class="wrule"></span></header>
+    <div class="wc fit"><div class="empty" id="o-empty" hidden></div><div class="cols">
+      <div class="col">
+        <div class="grid2">
+          <div class="field"><div class="lbl">Character</div><div class="drop" data-drop="o-char">Drop a character or reference sheet</div></div>
+          <div class="field"><div class="lbl">Outfit</div><div class="drop" data-drop="o-outfit">Drop an outfit picture</div></div>
+        </div>
+        <div class="field" id="o-facefield" hidden>
+          <div class="lbl">Face <em><button class="btn sm" id="o-faceclr" type="button">CLEAR BOX</button></em></div>
+          <div class="facepick" id="o-face"><img id="o-faceimg" alt="character, drag a box around the face"><i class="fb" id="o-fb" hidden></i></div>
+          <p class="note">Drag a box around the character's face (the main view on a sheet). Optional, but the likeness is much better with it.</p>
+        </div>
+        <div class="field"><label for="o-ckpt">Checkpoint <span class="mute">(SDXL family)</span></label><select id="o-ckpt"></select></div>
+        <div class="field"><label for="o-prompt">Prompt</label><textarea id="o-prompt" rows="3" placeholder="standing, looking at viewer, smile, city street, night"></textarea></div>
+        <div class="field"><label for="o-neg">Negative</label><textarea id="o-neg" rows="3"></textarea></div>
+        <div class="sl" data-id="o-chars" data-label="Character likeness" data-min="0" data-max="1" data-step="0.05" data-val="0.5"></div>
+        <div class="sl" data-id="o-outs" data-label="Outfit likeness" data-min="0" data-max="1" data-step="0.05" data-val="0.6"></div>
+        <div class="field"><label for="o-size">Size</label><select id="o-size"></select></div>
+        <div class="sl" data-id="o-steps" data-label="Steps" data-min="1" data-max="80" data-step="1" data-val="28"></div>
+        <div class="sl" data-id="o-cfg" data-label="CFG" data-min="1" data-max="20" data-step="0.5" data-val="6"></div>
+        <div class="grid2">
+          <div class="field"><label for="o-sampler">Sampler</label><select id="o-sampler"></select></div>
+          <div class="field"><label for="o-seed">Seed</label>
+            <div class="hrow" style="flex-wrap:nowrap"><input type="number" class="num" id="o-seed" value="-1" step="1"><button class="btn sm" id="o-dice" type="button" title="Random (-1)">&#9856;</button></div></div>
+        </div>
+        <div class="sl" data-id="o-batch" data-label="Batch" data-min="1" data-max="4" data-step="1" data-val="1"></div>
+        <label class="tog" for="o-pony"><span>Pony score tags</span><input type="checkbox" id="o-pony"></label>
+      </div>
+      <div class="col right">
+        <div class="stage" id="o-stage"><div class="ph">No image yet<br>Ctrl+Enter to generate</div></div>
+        <div class="thumbs" id="o-thumbs"></div>
+        <div class="prog"><div class="meter"><i id="o-bar"></i></div><div class="pt" id="o-pct"></div></div>
+        <div class="acts">
+          <button class="btn pri" id="o-go" type="button">GENERATE</button>
+          <button class="btn" id="o-cancel" type="button" disabled>CANCEL</button>
+          <button class="btn" id="o-save" type="button" disabled>SAVE AS</button>
+          <button class="btn" id="o-tocreate" type="button" disabled>TO CREATE</button>
+        </div>
+        <div class="why" id="o-why"></div>
+        <p class="note mono" id="o-used"></p>
+      </div>
+    </div></div>
+  </section>
+
   <!-- ================= MODELS ================= -->
   <section class="win" id="sec-models" hidden>
     <header class="wh"><span class="wt">MODELS</span><span class="wsub">One-click downloads</span><span class="wrule"></span><span class="chip dim" id="d-free"></span></header>
@@ -99,7 +146,7 @@
       <div class="cards mcards" id="d-ckpt"></div>
       <div class="lbl">Video</div>
       <div class="cards mcards" id="d-video"></div>
-      <div class="lbl">Extras <em>VAE and auto-taggers</em></div>
+      <div class="lbl">Extras <em>VAE, auto-taggers and the OUTFITS adapter</em></div>
       <div class="cards mcards" id="d-extra"></div>
       <div class="lbl">Import <em>.safetensors only</em></div>
       <div class="split" style="flex:none">

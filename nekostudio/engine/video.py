@@ -35,15 +35,17 @@ def _load(job: Job, model_id: str):
         raise RuntimeError("No CUDA GPU available. Video generation needs an NVIDIA GPU.")
     image_engine.unload()  # only one big model in VRAM at a time
     unload()
-    job.update(message="loading video model (first run downloads several GB)...")
+    job.update(message="loading video model...")
     from diffusers import AutoencoderKLWan, WanImageToVideoPipeline, WanPipeline
     from transformers import UMT5EncoderModel
-    vae = AutoencoderKLWan.from_pretrained(model_id, subfolder="vae", torch_dtype=torch.float32)
+    from .. import catalog
+    src = catalog.model_source(model_id)   # our local folder, or the HF cache for older installs
+    vae = AutoencoderKLWan.from_pretrained(src, subfolder="vae", torch_dtype=torch.float32)
     cls = WanImageToVideoPipeline if "i2v" in model_id.lower() else WanPipeline
     # The UMT5-XXL text encoder alone is ~11 GB in bf16, so cpu-offload (which moves a whole component to the
     # GPU) ran out of VRAM on 12 GB cards. It stays on the CPU and only encodes the prompt; the pipeline never sees it.
-    te = UMT5EncoderModel.from_pretrained(model_id, subfolder="text_encoder", torch_dtype=torch.bfloat16)
-    pipe = cls.from_pretrained(model_id, vae=vae, text_encoder=None, torch_dtype=torch.bfloat16)
+    te = UMT5EncoderModel.from_pretrained(src, subfolder="text_encoder", torch_dtype=torch.bfloat16)
+    pipe = cls.from_pretrained(src, vae=vae, text_encoder=None, torch_dtype=torch.bfloat16)
     _state["enc"] = WanPipeline(tokenizer=pipe.tokenizer, text_encoder=te, transformer=None, vae=None,
                                 scheduler=pipe.scheduler)
     vae.enable_tiling()  # decoding 33 frames at 832x480 in one go needs more than 12 GB in fp32
