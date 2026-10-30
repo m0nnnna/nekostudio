@@ -514,7 +514,7 @@ function whyNot(kind) {
   } else {
     if (!v("m-model")) return "No video model is configured.";
     const vm = S.models.video.find(x => x.id === v("m-model"));
-    if (vm && vm.in_catalog && vm.installed === false) return "This video model is not downloaded yet. Get it in MODELS.";
+    if (vm && vm.installed === false) return vm.in_catalog ? "This video model is not downloaded yet. Get it in MODELS." : "This video model is not downloaded and is not in the MODELS catalog. Pick an installed model.";
     if (!v("m-prompt").trim() && !drops["m-init"]) return "Enter a prompt.";
   }
   return "";

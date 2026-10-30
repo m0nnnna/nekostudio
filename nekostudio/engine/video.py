@@ -58,6 +58,10 @@ def run(job: Job, p: dict):
     from diffusers.utils import export_to_video
 
     model_id = p.get("model") or config.load_settings()["video_models"][0]["id"]
+    from .. import catalog
+    if not catalog.video_installed(model_id):  # from_pretrained would silently pull tens of GB inside the job
+        raise RuntimeError(f"{model_id} is not downloaded. Install it from MODELS (the 14B I2V model is not offered: "
+                           "it does not fit a 12 GB card).")
     is_i2v = "i2v" in model_id.lower()
     init = image_engine.decode_data_url(p["init_image"]) if p.get("init_image") else None
     if is_i2v and init is None:
