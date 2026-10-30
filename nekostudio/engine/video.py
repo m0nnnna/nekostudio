@@ -11,7 +11,7 @@ from .. import config
 from ..jobs import Job
 from . import image as image_engine
 
-_state: dict = {"id": None, "pipe": None}
+_state: dict = {"id": None, "pipe": None, "enc": None}
 
 
 def list_models() -> list[dict]:
@@ -19,7 +19,7 @@ def list_models() -> list[dict]:
 
 
 def unload():
-    _state.update(id=None, pipe=None)
+    _state.update(id=None, pipe=None, enc=None)
     import gc
     gc.collect()
     torch = sys.modules.get("torch")
@@ -37,9 +37,16 @@ def _load(job: Job, model_id: str):
     unload()
     job.update(message="loading video model (first run downloads several GB)...")
     from diffusers import AutoencoderKLWan, WanImageToVideoPipeline, WanPipeline
+    from transformers import UMT5EncoderModel
     vae = AutoencoderKLWan.from_pretrained(model_id, subfolder="vae", torch_dtype=torch.float32)
     cls = WanImageToVideoPipeline if "i2v" in model_id.lower() else WanPipeline
-    pipe = cls.from_pretrained(model_id, vae=vae, torch_dtype=torch.bfloat16)
+    # The UMT5-XXL text encoder alone is ~11 GB in bf16, so cpu-offload (which moves a whole component to the
+    # GPU) ran out of VRAM on 12 GB cards. It stays on the CPU and only encodes the prompt; the pipeline never sees it.
+    te = UMT5EncoderModel.from_pretrained(model_id, subfolder="text_encoder", torch_dtype=torch.bfloat16)
+    pipe = cls.from_pretrained(model_id, vae=vae, text_encoder=None, torch_dtype=torch.bfloat16)
+    _state["enc"] = WanPipeline(tokenizer=pipe.tokenizer, text_encoder=te, transformer=None, vae=None,
+                                scheduler=pipe.scheduler)
+    vae.enable_tiling()  # decoding 33 frames at 832x480 in one go needs more than 12 GB in fp32
     pipe.enable_model_cpu_offload()  # the only way 12 GB holds a Wan model
     pipe.set_progress_bar_config(disable=True)
     _state.update(id=model_id, pipe=pipe)
@@ -75,7 +82,13 @@ def run(job: Job, p: dict):
         job.update(progress=(i + 1) / steps, step=i + 1, total=steps, message=f"step {i + 1}/{steps}")
         return kw
 
-    kwargs = dict(prompt=p.get("prompt", ""), negative_prompt=p.get("negative") or None, height=height, width=width,
+    job.update(message="encoding prompt (CPU)...")
+    with torch.no_grad():
+        pe, ne = _state["enc"].encode_prompt(prompt=p.get("prompt", ""), negative_prompt=p.get("negative") or "",
+                                             do_classifier_free_guidance=True, device=torch.device("cpu"))
+    dev = torch.device("cuda")
+    pe, ne = pe.to(dev), ne.to(dev)
+    kwargs = dict(prompt_embeds=pe, negative_prompt_embeds=ne, height=height, width=width,
                   num_frames=frames, num_inference_steps=steps, guidance_scale=float(p.get("cfg") or 5.0),
                   generator=torch.Generator("cpu").manual_seed(seed), callback_on_step_end=cb)
     if init is not None:

@@ -58,6 +58,8 @@ for _d in (CHECKPOINTS, LORAS, VAES, TAGS, LLMS, IMAGES, VIDEOS, DATASETS, TRAIN
 os.environ.setdefault("HF_HOME", str(HF_HOME))
 # Plain single-stream HTTP for HF downloads (xet fetches many chunks in parallel and keeps a chunk cache).
 os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+# Less VRAM fragmentation: video decoding on 12 GB cards runs out of memory without it.
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 # Shares often can't do symlinks; huggingface_hub then copies into the cache by itself, no need to warn.
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 
